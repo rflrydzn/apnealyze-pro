@@ -1,7 +1,10 @@
+// src/app.js
 import React from 'react';
-import { BrowserRouter as Router, Route, Link, Routes } from 'react-router-dom'; // Use Routes instead of Switch
+import { BrowserRouter as Router, Route, Link, Routes } from 'react-router-dom';
 import MLPredictionPage from './pages/MLPredictionPage';
-import SensorDataPage from './pages/SensorStatusPage';
+import SessionsPage from './pages/SessionsPage';
+import SessionDetailPage from './pages/SessionDetailPage';
+import RecordingControlPage from './pages/RecordingControlPage';
 
 function App() {
   return (
@@ -16,15 +19,20 @@ function App() {
               <Link to="/ml-predict">Machine Learning Prediction</Link>
             </li>
             <li>
-              <Link to="/sensor-data">Sensor Data Collection</Link>
+              <Link to="/recording">Recording Control</Link>
+            </li>
+            <li>
+              <Link to="/sessions">Recording Sessions</Link>
             </li>
           </ul>
         </nav>
 
-        <Routes> {/* Use Routes instead of Switch */}
+        <Routes>
           <Route path="/" element={<h1>Welcome to the Home Page</h1>} />
           <Route path="/ml-predict" element={<MLPredictionPage />} />
-          <Route path="/sensor-data" element={<SensorDataPage />} />
+          <Route path="/recording" element={<RecordingControlPage />} />
+          <Route path="/sessions" element={<SessionsPage />} />
+          <Route path="/session/:sessionId" element={<SessionDetailPage />} />
         </Routes>
       </div>
     </Router>

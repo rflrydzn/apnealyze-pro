@@ -1,118 +1,191 @@
-from flask import Flask, request
+# app_data.py
+from flask import Flask, request, jsonify
 from flask_cors import CORS
-import threading
-import time
 import mysql.connector
 from mysql.connector import Error
-import requests  # For sending POST requests to /data
 
 app = Flask(__name__)
-
-# Enable CORS for all domains
 CORS(app)
 
-# This flag will store whether we should be sending data
-sending_data = False
-data_thread = None  # The thread will be stored here
-
 # MySQL configuration
-host = 'localhost'
+db_host = 'localhost'
 database = 'sensor_data'
-user = 'root'
-password = 'dizon0019'
+db_user = 'root'
+db_password = 'dizon0019'
 
-# Data insertion function into MySQL
-def insert_data(heartrate, oxygen, confidence):
+# Global variable to track whether recording is active
+recording_active = False
+current_session_id = None
+
+###############################
+# Utility: Insert sensor reading into DB
+###############################
+def insert_data(heartrate, oxygen, confidence, session_id=None):
     try:
         connection = mysql.connector.connect(
-            host=host,
+            host=db_host,
             database=database,
-            user=user,
-            password=password
+            user=db_user,
+            password=db_password
         )
         if connection.is_connected():
             cursor = connection.cursor()
-            query = "INSERT INTO readings (heartrate, oxygen_level, confidence) VALUES (%s, %s, %s)"
-            cursor.execute(query, (heartrate, oxygen, confidence))
+            query = "INSERT INTO readings (heartrate, oxygen_level, confidence, session_id) VALUES (%s, %s, %s, %s)"
+            cursor.execute(query, (heartrate, oxygen, confidence, session_id))
             connection.commit()
             cursor.close()
-            print("Data inserted:", heartrate, oxygen, confidence)
+            print("Data inserted:", heartrate, oxygen, confidence, session_id)
     except Error as e:
-        print("Error while connecting to MySQL", e)
+        print("Error while inserting data into MySQL:", e)
     finally:
         if connection.is_connected():
             connection.close()
 
-# Data sending function that waits for the trigger from frontend
-def send_data_to_db():
-    global sending_data
-    while sending_data:
-        # Receive sensor data from Arduino (via POST request)
-        # Use placeholders here; real sensor data comes from Arduino
-        heartrate = 75  # Placeholder, replace with real sensor data from Arduino
-        oxygen = 98     # Placeholder
-        confidence = 95 # Placeholder
+###############################
+# Endpoint: Start Recording
+###############################
+@app.route('/recording/start', methods=['POST'])
+def start_recording():
+    global current_session_id, recording_active
+    try:
+        connection = mysql.connector.connect(
+            host=db_host,
+            database=database,
+            user=db_user,
+            password=db_password
+        )
+        cursor = connection.cursor()
+        # Insert NULL for user_id since we're not using login.
+        query = "INSERT INTO sessions (user_id) VALUES (%s)"
+        cursor.execute(query, (None,))
+        connection.commit()
+        session_id = cursor.lastrowid
+        current_session_id = session_id
+        cursor.close()
+        connection.close()
 
-        # Send dynamic data to DB
-        print(f"Sending data to DB: heartrate={heartrate}, oxygen={oxygen}, confidence={confidence}")
+        # Set the recording flag to true so that the Arduino knows to send data.
+        recording_active = True
+        return jsonify({'msg': 'Recording started', 'session_id': session_id}), 201
+    except Exception as e:
+        print("Error in /recording/start:", e)
+        return jsonify({'msg': 'Error starting recording', 'error': str(e)}), 500
 
-        # Send data to Flask /data endpoint using requests
-        response = requests.post("http://localhost:5001/data", data={
-            "heartrate": heartrate,
-            "oxygen": oxygen,
-            "confidence": confidence
-        })
 
-        if response.status_code == 200:
-            print("Data successfully sent to the server.")
-        else:
-            print("Failed to send data to the server.")
+###############################
+# Endpoint: Stop Recording
+###############################
+@app.route('/recording/stop', methods=['POST'])
+def stop_recording():
+    global recording_active, current_session_id
+    data = request.get_json()
+    session_id = data.get('session_id')
+    if not session_id:
+        return jsonify({'msg': 'Session ID is required.'}), 400
 
-        # Sleep for 2 seconds before sending the next set of data
-        time.sleep(2)
+    # Turn off the recording flag.
+    recording_active = False
 
-# Endpoint to start sending data
-@app.route('/start-sending-data', methods=['POST'])
-def start_sending_data():
-    global sending_data, data_thread
-    if not sending_data:
-        sending_data = True
-        # Start sending data in a separate thread only when triggered by the frontend
-        data_thread = threading.Thread(target=send_data_to_db)
-        data_thread.start()
-        return "Data sending started.", 200
-    return "Data is already being sent.", 400
+    try:
+        connection = mysql.connector.connect(
+            host=db_host,
+            database=database,
+            user=db_user,
+            password=db_password
+        )
+        cursor = connection.cursor()
+        query = "UPDATE sessions SET end_time = NOW() WHERE id = %s"
+        cursor.execute(query, (session_id,))
+        connection.commit()
+        cursor.close()
+        connection.close()
+        current_session_id = None
+        return jsonify({'msg': 'Recording stopped'}), 200
+    except Exception as e:
+        print("Error in /recording/stop:", e)
+        return jsonify({'msg': 'Error stopping recording', 'error': str(e)}), 500
 
-# Endpoint to stop sending data
-@app.route('/stop-sending-data', methods=['POST'])
-def stop_sending_data():
-    global sending_data
-    if sending_data:
-        sending_data = False
-        # Wait for the thread to stop (gracefully stop it)
-        if data_thread is not None:
-            data_thread.join()  # Ensure the thread has finished before stopping
-        return "Data sending stopped.", 200
-    return "No data is being sent.", 400
+###############################
+# Endpoint: Recording Status (for Arduino)
+###############################
+@app.route('/recording/status', methods=['GET'])
+def recording_status():
+    # Return "true" if recording is active, else "false"
+    return "true" if recording_active else "false", 200
 
-# The /data endpoint for inserting received sensor data into MySQL
+###############################
+# Endpoint: Receive sensor data from Arduino
+###############################
 @app.route('/data', methods=['POST'])
 def receive_data():
-    # Receive dynamic sensor data from the POST request body
+    global current_session_id  # The session id set in /recording/start
     try:
         heartrate = request.form.get('heartrate')
         oxygen = request.form.get('oxygen')
         confidence = request.form.get('confidence')
+        session_id = request.form.get('session_id')
+        # If no session_id was provided, use the global current_session_id
+        if not session_id and current_session_id is not None:
+            session_id = current_session_id
 
-        # Validate that all data is present
         if heartrate and oxygen and confidence:
-            # Insert the received data into the database
-            insert_data(heartrate, oxygen, confidence)
+            insert_data(heartrate, oxygen, confidence, session_id)
             return "Data received and stored.", 200
         else:
             return "Invalid data.", 400
     except Exception as e:
+        print("Error in /data:", e)
         return f"Error processing the data: {e}", 500
+
+@app.route('/sessions', methods=['GET'])
+def list_sessions():
+    try:
+        connection = mysql.connector.connect(
+            host=db_host,
+            database=database,
+            user=db_user,
+            password=db_password
+        )
+        cursor = connection.cursor(dictionary=True)
+        query = "SELECT * FROM sessions ORDER BY start_time DESC"
+        cursor.execute(query)
+        sessions = cursor.fetchall()
+        cursor.close()
+        connection.close()
+        return jsonify({'sessions': sessions}), 200
+    except Exception as e:
+        print("Error in /sessions:", e)
+        return jsonify({'msg': 'Error retrieving sessions', 'error': str(e)}), 500
+
+@app.route('/session/<int:session_id>', methods=['GET'])
+def get_session_data(session_id):
+    try:
+        connection = mysql.connector.connect(
+            host=db_host,
+            database=database,
+            user=db_user,
+            password=db_password
+        )
+        cursor = connection.cursor(dictionary=True)
+        
+        # Fetch the session information
+        query = "SELECT * FROM sessions WHERE id = %s"
+        cursor.execute(query, (session_id,))
+        session = cursor.fetchone()
+        if not session:
+            return jsonify({'msg': 'Session not found.'}), 404
+        
+        # Fetch all sensor readings for the session, ordered by timestamp
+        query = "SELECT * FROM readings WHERE session_id = %s ORDER BY timestamp ASC"
+        cursor.execute(query, (session_id,))
+        readings = cursor.fetchall()
+        
+        cursor.close()
+        connection.close()
+        return jsonify({'session': session, 'readings': readings}), 200
+    except Exception as e:
+        print("Error in /session/{}: {}".format(session_id, e))
+        return jsonify({'msg': 'Error retrieving session data', 'error': str(e)}), 500
 
 if __name__ == "__main__":
     app.run(host='0.0.0.0', port=5001)
