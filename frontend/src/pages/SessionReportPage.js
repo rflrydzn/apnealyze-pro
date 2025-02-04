@@ -1,8 +1,8 @@
-// src/pages/SessionDetailPage.js
+// src/pages/SessionReportPage.js
 import React, { useEffect, useState } from 'react';
 import axios from 'axios';
-import { useParams, Link } from 'react-router-dom';
 import { Line } from 'react-chartjs-2';
+import { useParams, Link } from 'react-router-dom';
 import {
   Chart as ChartJS,
   CategoryScale,
@@ -16,7 +16,7 @@ import {
 
 ChartJS.register(CategoryScale, LinearScale, PointElement, LineElement, Title, Tooltip, Legend);
 
-const SessionDetailPage = () => {
+const SessionReportPage = () => {
   const { sessionId } = useParams();
   const [report, setReport] = useState(null);
   const [isLoading, setIsLoading] = useState(true);
@@ -35,17 +35,20 @@ const SessionDetailPage = () => {
     fetchReport();
   }, [sessionId]);
 
-  if (isLoading) return <p>Loading session report...</p>;
-  if (!report) return <p>Error loading session report.</p>;
+  if (isLoading) return <p>Loading report...</p>;
+  if (!report) return <p>Error loading report.</p>;
 
+  // Prepare chart data using the raw readings from the report
   const labels = report.readings.map((_, index) => index + 1);
+  const heartRateData = report.readings.map((r) => r.heartrate);
+  const oxygenData = report.readings.map((r) => r.oxygen_level);
 
   const hrChartData = {
     labels: labels,
     datasets: [
       {
         label: 'Heart Rate (BPM)',
-        data: report.readings.map(r => r.heartrate),
+        data: heartRateData,
         borderColor: 'rgb(75, 192, 192)',
         fill: false,
       },
@@ -57,7 +60,7 @@ const SessionDetailPage = () => {
     datasets: [
       {
         label: 'Oxygen Saturation (%)',
-        data: report.readings.map(r => r.oxygen_level),
+        data: oxygenData,
         borderColor: 'rgb(255, 99, 132)',
         fill: false,
       },
@@ -65,7 +68,7 @@ const SessionDetailPage = () => {
   };
 
   return (
-    <div className="report-container">
+    <div>
       <h1>Session Report for Session #{sessionId}</h1>
       <div>
         <h2>Summary Statistics</h2>
@@ -81,11 +84,11 @@ const SessionDetailPage = () => {
           <li>Total Duration (seconds): {report.recording_duration_seconds}</li>
         </ul>
       </div>
-      <div className="chart-container">
+      <div>
         <h2>Heart Rate Over Time</h2>
         <Line data={hrChartData} />
       </div>
-      <div className="chart-container">
+      <div>
         <h2>Oxygen Saturation Over Time</h2>
         <Line data={oxChartData} />
       </div>
@@ -96,4 +99,4 @@ const SessionDetailPage = () => {
   );
 };
 
-export default SessionDetailPage;
+export default SessionReportPage;

@@ -5,11 +5,12 @@ import MLPredictionPage from './pages/MLPredictionPage';
 import SessionsPage from './pages/SessionsPage';
 import SessionDetailPage from './pages/SessionDetailPage';
 import RecordingControlPage from './pages/RecordingControlPage';
+import './App.css'; // Import the global CSS
 
 function App() {
   return (
     <Router>
-      <div>
+      <div className="app-container">
         <nav>
           <ul>
             <li>

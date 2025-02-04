@@ -187,5 +187,70 @@ def get_session_data(session_id):
         print("Error in /session/{}: {}".format(session_id, e))
         return jsonify({'msg': 'Error retrieving session data', 'error': str(e)}), 500
 
+# Endpoint: Generate a detailed session report
+@app.route('/session/<int:session_id>/report', methods=['GET'])
+def session_report(session_id):
+    try:
+        connection = mysql.connector.connect(
+            host=db_host,
+            database=database,
+            user=db_user,
+            password=db_password
+        )
+        cursor = connection.cursor(dictionary=True)
+        
+        # Retrieve all sensor readings for the session
+        query = "SELECT * FROM readings WHERE session_id = %s ORDER BY timestamp ASC"
+        cursor.execute(query, (session_id,))
+        readings = cursor.fetchall()
+        
+        if not readings:
+            return jsonify({'msg': 'No readings found for session.'}), 404
+
+        # Extract data arrays from the readings
+        heart_rates = [float(r['heartrate']) for r in readings if r['heartrate'] is not None]
+        oxygens = [float(r['oxygen_level']) for r in readings if r['oxygen_level'] is not None]
+
+        # Calculate summary statistics for heart rate
+        avg_hr = sum(heart_rates) / len(heart_rates) if heart_rates else None
+        max_hr = max(heart_rates) if heart_rates else None
+        min_hr = min(heart_rates) if heart_rates else None
+
+        # Calculate summary statistics for oxygen saturation
+        avg_ox = sum(oxygens) / len(oxygens) if oxygens else None
+        max_ox = max(oxygens) if oxygens else None
+        min_ox = min(oxygens) if oxygens else None
+
+        # Estimate desaturation events
+        # For example, define a desaturation event as any reading with oxygen < 90%
+        desaturation_events = sum(1 for o in oxygens if o < 90)
+
+        # Assuming each reading represents 3 seconds of data,
+        # compute total duration (in hours) for the ODI calculation.
+        total_duration_hours = (len(readings) * 3) / 3600.0  
+        ODI = desaturation_events / total_duration_hours if total_duration_hours > 0 else None
+
+        report = {
+            "average_heart_rate": avg_hr,
+            "max_heart_rate": max_hr,
+            "min_heart_rate": min_hr,
+            "average_oxygen": avg_ox,
+            "max_oxygen": max_ox,
+            "min_oxygen": min_ox,
+            "desaturation_events": desaturation_events,
+            "ODI": ODI,
+            "total_readings": len(readings),
+            "recording_duration_seconds": len(readings) * 3,
+            "readings": readings  # Include raw readings for charting in the frontend
+        }
+
+        cursor.close()
+        connection.close()
+        return jsonify(report), 200
+
+    except Exception as e:
+        print("Error generating report for session {}: {}".format(session_id, e))
+        return jsonify({'msg': 'Error generating session report', 'error': str(e)}), 500
+    
 if __name__ == "__main__":
     app.run(host='0.0.0.0', port=5001)

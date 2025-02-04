@@ -1,3 +1,4 @@
+// src/components/PredictForm.js
 import React, { useState } from 'react';
 
 const PredictForm = ({ onSubmit }) => {
@@ -25,7 +26,7 @@ const PredictForm = ({ onSubmit }) => {
 
   const handleSubmit = (e) => {
     e.preventDefault();
-    onSubmit(formData); // Trigger the onSubmit function passed from parent
+    onSubmit(formData);
   };
 
   return (

@@ -1,4 +1,4 @@
-// frontend/pages/SessionsPage.js
+// src/pages/SessionsPage.js
 import React, { useEffect, useState } from 'react';
 import axios from 'axios';
 import { Link } from 'react-router-dom';
@@ -17,7 +17,7 @@ const SessionsPage = () => {
   return (
     <div>
       <h1>Your Recording Sessions</h1>
-      <ul>
+      <ul className="sessions-list">
         {sessions.map((session) => (
           <li key={session.id}>
             <Link to={`/session/${session.id}`}>
