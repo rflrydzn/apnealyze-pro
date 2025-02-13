@@ -1,6 +1,4 @@
 /* src/App.css */
-
-/* General page styles */
 body {
   margin: 0;
   font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
@@ -8,14 +6,12 @@ body {
   color: #333;
 }
 
-/* Container for the whole app */
 .app-container {
   max-width: 1200px;
   margin: 0 auto;
   padding: 20px;
 }
 
-/* Navigation styles */
 nav {
   background-color: #2c3e50;
   padding: 10px;
@@ -29,10 +25,6 @@ nav ul {
   padding: 0;
 }
 
-nav ul li {
-  margin: 0;
-}
-
 nav ul li a {
   text-decoration: none;
   color: #ecf0f1;
@@ -43,12 +35,37 @@ nav ul li a:hover {
   color: #bdc3c7;
 }
 
-/* Page title */
-h1, h2 {
+h1, h2, h3 {
   color: #2c3e50;
 }
 
-/* Buttons */
+.report-container {
+  background: #fff;
+  padding: 20px;
+  border-radius: 6px;
+  box-shadow: 0 0 8px rgba(0,0,0,0.1);
+  margin: 20px auto;
+}
+
+table {
+  width: 100%;
+  border-collapse: collapse;
+  margin: 20px 0;
+}
+
+table, th, td {
+  border: 1px solid #ddd;
+}
+
+th, td {
+  padding: 8px;
+  text-align: center;
+}
+
+.chart-container {
+  margin: 20px 0;
+}
+
 button {
   background-color: #3498db;
   color: #fff;
@@ -57,14 +74,12 @@ button {
   margin: 10px 0;
   border-radius: 4px;
   cursor: pointer;
-  font-size: 16px;
 }
 
 button:hover {
   background-color: #2980b9;
 }
 
-/* Form styles */
 form {
   background: #fff;
   padding: 20px;
@@ -88,7 +103,6 @@ form input {
   border-radius: 4px;
 }
 
-/* Sessions List */
 .sessions-list {
   list-style: none;
   padding: 0;
@@ -106,22 +120,4 @@ form input {
   text-decoration: none;
   color: #3498db;
   font-weight: bold;
-}
-
-/* Report Page Styles */
-.report-container {
-  background: #fff;
-  padding: 20px;
-  border-radius: 6px;
-  box-shadow: 0 0 8px rgba(0, 0, 0, 0.1);
-  margin: 20px auto;
-  max-width: 800px;
-}
-
-.report-container ul {
-  padding-left: 20px;
-}
-
-.chart-container {
-  margin: 20px 0;
 }
