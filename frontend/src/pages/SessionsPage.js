@@ -8,8 +8,12 @@ const SessionsPage = () => {
 
   useEffect(() => {
     const fetchSessions = async () => {
-      const response = await axios.get('http://localhost:5001/sessions');
-      setSessions(response.data.sessions);
+      try {
+        const response = await axios.get('http://localhost:5001/sessions');
+        setSessions(response.data.sessions);
+      } catch (error) {
+        console.error('Error fetching sessions:', error);
+      }
     };
     fetchSessions();
   }, []);
@@ -18,7 +22,7 @@ const SessionsPage = () => {
     <div>
       <h1>Your Recording Sessions</h1>
       <ul className="sessions-list">
-        {sessions.map((session) => (
+        {sessions.map(session => (
           <li key={session.id}>
             <Link to={`/session/${session.id}`}>
               Session #{session.id} started at {new Date(session.start_time).toLocaleString()}
