@@ -1,42 +1,46 @@
+// src/pages/MLPredictionPage.js
 import React, { useState } from 'react';
-import PredictForm from '../components/PredictForm'; // Import the form component
+import PredictForm from '../components/PredictForm';
 
 const MLPredictionPage = () => {
   const [prediction, setPrediction] = useState(null);
   const [isLoading, setIsLoading] = useState(false);
 
   const handleFormSubmit = async (formData) => {
-    setIsLoading(true); // Set loading to true when form is submitted
-
+    setIsLoading(true);
+    setPrediction(null);
     try {
-      const response = await fetch('http://localhost:5000/predict', {
+      const response = await fetch('http://127.0.0.1:5000/predict', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify(formData),
       });
-
+  
+      if (!response.ok) {
+        throw new Error(`Server error: ${response.status}`);
+      }
+  
       const result = await response.json();
-      setPrediction(result); // Set the result to display
+      setPrediction(result.result);
     } catch (error) {
       console.error('Error:', error);
+      setPrediction('Error: Unable to get prediction');
     } finally {
-      setIsLoading(false); // Set loading to false when the request is complete
+      setIsLoading(false);
     }
   };
 
   return (
     <div>
       <h1>Machine Learning Prediction</h1>
-      <PredictForm onSubmit={handleFormSubmit} /> {/* Pass handleFormSubmit as prop */}
-      
+      <PredictForm onSubmit={handleFormSubmit} />
       {isLoading && <p>Loading...</p>}
-      
       {prediction && (
         <div>
           <h2>Prediction Result:</h2>
-          <p>{prediction.result}</p>
+          <p>{prediction}</p>
         </div>
       )}
     </div>
