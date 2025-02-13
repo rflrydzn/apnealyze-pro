@@ -30,9 +30,9 @@ Ensure you have the following installed before running the project:
 2. **Create the Database and Schemas**  
    - Open **PostgreSQL** and run:
 
-   +++sql
+   ```sql
    CREATE DATABASE snap_to_app;
-   +++
+   ```
 
    - Navigate to **Schemas** in `snap_to_app` and create **four schemas**:
      - `billing`
@@ -44,20 +44,20 @@ Ensure you have the following installed before running the project:
    - Open **PostgreSQL > Login/Group Roles**  
    - Run the following SQL queries:
 
-   +++sql
+   ```sql
    CREATE ROLE admin WITH LOGIN PASSWORD 'root';
    ALTER ROLE admin WITH SUPERUSER;
    ALTER ROLE admin WITH CREATEDB CREATEROLE;
    ALTER ROLE admin WITH REPLICATION;
    GRANT pg_read_all_data TO admin;
    GRANT pg_write_all_data TO admin;
-   +++
+   ```
 
    - Enable `uuid-ossp` extension:
 
-   +++sql
+   ```sql
    CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
-   +++
+   ```
 
 4. **Create `api_user` and Grant Permissions**  
    - Right-click `PostgreSQL > Create > Login/Group Role`  
@@ -65,7 +65,7 @@ Ensure you have the following installed before running the project:
 
    - Assign permissions using:
 
-   +++sql
+   ```sql
    GRANT ALL ON SCHEMA organization TO api_user;
 
    ALTER DEFAULT PRIVILEGES FOR ROLE admin IN SCHEMA organization
@@ -86,7 +86,7 @@ Ensure you have the following installed before running the project:
    ALTER DEFAULT PRIVILEGES GRANT ALL ON TABLES TO api_user;
 
    GRANT USAGE, SELECT ON ALL SEQUENCES IN SCHEMA organization TO api_user;
-   +++
+   ```
 
 ---
 
@@ -98,15 +98,15 @@ Ensure you have the following installed before running the project:
 2. **Navigate to the Configuration Directory**  
    - Open a terminal and go to:
 
-   +++sh
+   ```sh
    cd snaptoapp-auth/pkg/config
-   +++
+   ```
 
 3. **Run the Docker Compose Command**  
 
-   +++sh
+   ```sh
    docker compose up
-   +++
+   ```
 
 ---
 
