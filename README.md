@@ -47,7 +47,7 @@ For running the project locally, follow these steps:
 VITE_API_URL=http://localhost:9000       # Local Development API URL
 VITE_ENVIRONMENT=development             # Environment type (development/staging/production)
 ```
-2. Modify both useEffect hooks for local development. You need to modify both AppLink and PreviewLink components to ensure they use localhost:3001 in development mode.
+2. Modify both useEffect hooks for local development. You need to modify both AppLink and PreviewLink components to ensure they use localhost:3001 in development mode.                   
 Modify src/pages/CustomizeApp/Publish/AppLink/index.tsx
 ```sh
 useEffect(() => {
