@@ -37,12 +37,11 @@ npm i
 ## **Setup**
 
 ### **Environmental Variables**
+Before running the project, ensure you have the necessary environment variables set up. These variables are required for API communication, authentication, and third-party services.
 ```sh
-git clone https://github.com/your-org/snaptoapp-frontend-admin.git
-cd snaptoapp-frontend-admin
+VITE_API_URL=https://dapi.snaptoapp.com  # Production API URL
+VITE_API_URL=http://localhost:9000       # Local Development API URL
+VITE_ENVIRONMENT=development             # Environment type (development/staging/production)
 ```
 
-### **Install Dependencies**
-```sh
-npm i
-```
+---
