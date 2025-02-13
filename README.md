@@ -23,7 +23,7 @@ Before running the frontend repository, ensure you have the following installed:
 
 ### **Clone the Repository**
 ```sh
-git clone https://github.com/your-org/snaptoapp-frontend-admin.git
+git clone https://<your-bitbucket-username>@bitbucket.org/hoolisoftware/snaptoapp-frontend-admin.git
 cd snaptoapp-frontend-admin
 ```
 
@@ -40,7 +40,39 @@ VITE_API_URL=http://localhost:9000       # Local Development API URL
 VITE_ENVIRONMENT=development             # Environment type (development/staging/production)
 ```
 ### **Setup for Local Development**
-For running the project locally, ensure that the .env file contains the correct local API URL and development keys.
+For running the project locally, follow these steps:
+1. Ensure that .env file is correctly set up, comment out the production API URL to avoid conflicts.
+```sh
+#VITE_API_URL=https://dapi.snaptoapp.com  # Production API URL
+VITE_API_URL=http://localhost:9000       # Local Development API URL
+VITE_ENVIRONMENT=development             # Environment type (development/staging/production)
+```
+2. Modify both useEffect hooks for local development. You need to modify both AppLink and PreviewLink components to ensure they use localhost:3001 in development mode.
+Modify src/pages/CustomizeApp/Publish/AppLink/index.tsx
+```sh
+useEffect(() => {
+		if (ENVIRONMENT === 'development') {
+			setPWAUrl('localhost:3001');
+		} else if (ENVIRONMENT === 'test') {
+			setPWAUrl('tapp.snaptoapp.com');
+		} else {
+			setPWAUrl('app.snaptoapp.com');
+		}
+	}, []);
+```
+
+Modify src/pages/CustomizeApp/Publish/PreviewLink/index.tsx
+```sh
+useEffect(() => {
+		if (ENVIRONMENT === 'development') {
+			setPWAUrl('localhost:3001');
+		} else if (ENVIRONMENT === 'test') {
+			setPWAUrl('tapp.snaptoapp.com');
+		} else {
+			setPWAUrl('app.snaptoapp.com');
+		}
+	}, []);
+```
 
 ### **Running the Application**
 ```sh
@@ -91,4 +123,4 @@ snaptoapp-frontend-admin/
 │── tsconfig.node.json         # TypeScript config for Node.js
 │── vite.config.ts             # Vite configuration file
 ```
-
+---
