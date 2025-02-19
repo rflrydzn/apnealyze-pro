@@ -1,20 +1,24 @@
 // src/pages/FullReportPage.js
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useRef } from 'react';
 import axios from 'axios';
 import { useParams, Link } from 'react-router-dom';
-import { Line } from 'react-chartjs-2';
+import { Line, Scatter } from 'react-chartjs-2';
 import {
   Chart as ChartJS,
   CategoryScale,
   LinearScale,
+  TimeScale,
   PointElement,
   LineElement,
   Title,
   Tooltip,
   Legend,
 } from 'chart.js';
+import 'chartjs-adapter-date-fns'; // ✅ Adapter for time-based scales
 
-ChartJS.register(CategoryScale, LinearScale, PointElement, LineElement, Title, Tooltip, Legend);
+
+// Register all necessary scales (including TimeScale)
+ChartJS.register(CategoryScale, LinearScale, TimeScale, PointElement, LineElement, Title, Tooltip, Legend);
 
 // Safe function to handle .toFixed() without crashing
 const safeToFixed = (value, decimals = 2, unit = '') =>
@@ -43,6 +47,7 @@ const FullReportPage = () => {
   const { sessionId } = useParams();
   const [report, setReport] = useState(null);
   const [isLoading, setIsLoading] = useState(true);
+  const snoreChartRef = useRef(null); // ✅ Move useRef to the top
 
   useEffect(() => {
     const fetchFullReport = async () => {
@@ -59,9 +64,23 @@ const FullReportPage = () => {
     fetchFullReport();
   }, [sessionId]);
   
+  // ✅ Ensure cleanup before the component unmounts
+  useEffect(() => {
+    return () => {
+      if (snoreChartRef.current) {
+        snoreChartRef.current.destroy(); 
+      }
+    };
+  }, []);
 
   if (isLoading) return <p>Loading full session report...</p>;
   if (!report) return <p>Error loading session report.</p>;
+
+    // Build scatter plot data from snore_timestamps (assuming ISO strings)
+  const snoreData = report.trend_overview?.snore_timestamps?.map((ts) => ({
+    x: ts, 
+    y: 1 // use a constant value for the marker (or adjust if you have a measure)
+  })) || [];
 
   // Build the dataset for the Position Graph using numeric values
   const positionNumbers = report.trend_overview?.positions?.map(mapPositionToNumber) || [];
@@ -135,6 +154,42 @@ const FullReportPage = () => {
     ],
   };
 
+
+
+
+
+const snoreChartData = {
+  datasets: [
+    {
+      label: 'Snore Events',
+      data: snoreData,
+      backgroundColor: 'red',
+      pointRadius: 5,
+    },
+  ],
+};
+
+const snoreChartOptions = {
+  responsive: true,
+  scales: {
+    x: {
+      type: 'time', // ✅ Ensure this is recognized
+      time: {
+        unit: 'minute', // ✅ Use 'minute' instead of 'second' for better scaling
+      },
+      title: {
+        display: true,
+        text: 'Time',
+      },
+    },
+    y: {
+      display: false, // Hide Y-axis since we're only marking events
+    },
+  },
+};
+
+
+
   return (
     <div className="report-container">
       <h1>Sleep Study Report</h1>
@@ -153,7 +208,8 @@ const FullReportPage = () => {
           </tr>
           <tr>
             <td><strong>Snore Percentage:</strong></td>
-            <td>{safeToFixed(report.overview?.Snore_Percentage, 2, " %")}</td>
+              <td>{safeToFixed(report.overview?.Snore_Percentage, 2, " %")}</td>
+              <td>{safeToFixed(report.overview?.Snore_Duration, 1, " min")}</td>
           </tr>
         </tbody>
       </table>
@@ -423,7 +479,7 @@ const FullReportPage = () => {
       </div>
       <div className="chart-container">
         <h3>Snoring Train</h3>
-        {/* Placeholder for Snoring Train Graph */}
+        <Scatter key={JSON.stringify(snoreChartData)} ref={snoreChartRef} data={snoreChartData} options={snoreChartOptions} />
       </div>
       <div className="chart-container">
         <h3>Limitation Trends</h3>
