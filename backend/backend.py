@@ -357,6 +357,32 @@ def full_report(session_id):
     except Exception as e:
         print("Error generating full report for session {}: {}".format(session_id, e))
         return jsonify({'msg': 'Error generating full session report', 'error': str(e)}), 500
+    
+@app.route('/snore_data', methods=['POST'])
+def receive_snore_data():
+    try:
+        # Use session_id from the POST data or fallback to the current session
+        session_id = request.form.get('session_id') or current_session_id
+        snore_value = request.form.get('snore')
+        if session_id is None or snore_value is None:
+            return "Missing session_id or snore value", 400
+
+        connection = mysql.connector.connect(
+            host=db_host,
+            database=database,
+            user=db_user,
+            password=db_password
+        )
+        cursor = connection.cursor()
+        query = "INSERT INTO snore_readings (session_id, snore) VALUES (%s, %s)"
+        cursor.execute(query, (session_id, snore_value))
+        connection.commit()
+        cursor.close()
+        connection.close()
+        return "Snore data received and stored.", 200
+    except Exception as e:
+        print("Error in /snore_data:", e)
+        return jsonify({'msg': 'Error processing snore data', 'error': str(e)}), 500
 
 ###########################################
 # Run the Flask Application
