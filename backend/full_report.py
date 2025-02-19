@@ -45,6 +45,23 @@ def full_report(session_id):
         # Count desaturation events (oxygen level < 90)
         total_desat_events = sum(1 for r in readings if r.get('oxygen_level') is not None and float(r['oxygen_level']) < 90)
         ODI = total_desat_events / total_duration_hours if total_duration_hours > 0 else None
+
+        try:
+            connection = mysql.connector.connect(
+                    host=db_host,
+                    database=database,
+                    user=db_user,
+                    password=db_password
+                )
+            cursor = connection.cursor(dictionary=True)
+            query_snore = "SELECT * FROM snore_readings WHERE session_id = %s ORDER BY timestamp ASC"
+            cursor.execute(query_snore, (session_id,))
+            snore_data = cursor.fetchall()
+            cursor.close()
+            connection.close()
+        except Exception as e:
+            print("Error fetching snore data:", e)
+            snore_data = []
         
         # Calculate Snore Percentage (percentage of readings where snore value > 0.5)
         snore_count = sum(1 for r in readings if r.get('snore') and float(r['snore']) > 0.5)
@@ -123,14 +140,15 @@ def full_report(session_id):
             "event_types": [r.get('event_type', 'none') for r in readings],
             "oxygen_levels": [float(r['oxygen_level']) for r in readings if r.get('oxygen_level')],
             "heart_rates": [float(r['heartrate']) for r in readings if r.get('heartrate')],
-            "snore_values": [float(r.get('snore', 0)) for r in readings]
+            "snore_timestamps": [s["timestamp"] for s in snore_data if float(s.get("snore", 0)) > 0.5],
         }
         
         report = {
             "overview": {
                 "AHI": AHI,
                 "ODI": ODI,
-                "Snore_Percentage": snore_percentage
+                "Snore_Percentage": snore_percentage,
+                "Snore_Duration": snore_duration
             },
             "respiratory_indices": {
                 "Total_AH": total_AH_events,
