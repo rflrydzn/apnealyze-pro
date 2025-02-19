@@ -20,7 +20,15 @@ SparkFun_Bio_Sensor_Hub bioHub(resPin, mfioPin);
 bioData body;
 
 // Function to detect sleep position using IMU acceleration values
+// Function to detect sleep position using IMU acceleration values
 String detectSleepPosition(float x, float y, float z) {
+  Serial.print("IMU Readings -> X: ");
+  Serial.print(x);
+  Serial.print(" Y: ");
+  Serial.print(y);
+  Serial.print(" Z: ");
+  Serial.println(z);
+
   if (z > 0.8) {
     return "Lying on Back (Supine)";
   } else if (z < -0.8) {
@@ -30,9 +38,9 @@ String detectSleepPosition(float x, float y, float z) {
   } else if (x < -0.8) {
     return "Lying on Left Side";
   } else if (y > 0.8) {
-    return "Sitting / Upright";
+    return "Sitting / Upright"; // Ensures upright detection
   } else {
-    return "Unknown Position";
+    return "Lying on Back (Supine)";  // Default to supine instead of unknown
   }
 }
 
