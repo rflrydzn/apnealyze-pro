@@ -44,6 +44,25 @@ def insert_data(heartrate, oxygen, confidence, position, session_id=None):
             connection.close()
 
 ###########################################
+# Helper Function: Count Desaturation Events
+###########################################
+def count_desaturation_events(readings, threshold=3):
+    """
+    Counts desaturation events where the drop from the previous reading is >= threshold.
+    This avoids counting prolonged low SpO₂ as multiple events.
+    """
+    desat_events = 0
+    prev_spo2 = None
+    for r in readings:
+        if r.get('oxygen_level') is None:
+            continue
+        current_spo2 = float(r['oxygen_level'])
+        if prev_spo2 is not None and (prev_spo2 - current_spo2) >= threshold:
+            desat_events += 1
+        prev_spo2 = current_spo2
+    return desat_events
+
+###########################################
 # Endpoint: Start Recording
 ###########################################
 @app.route('/recording/start', methods=['POST'])
@@ -200,16 +219,20 @@ def full_report(session_id):
         if not readings:
             return jsonify({'msg': 'No readings found for session.'}), 404
         
+        
+        
         total_readings = len(readings)
         total_duration_seconds = total_readings * 3  # Each reading is 3 seconds
         total_duration_hours = total_duration_seconds / 3600.0
 
+        
         # === Overview Calculations ===
         total_AH_events = sum(1 for r in readings if r.get('event_type') in ['apnea', 'hypopnea'])
         AHI = total_AH_events / total_duration_hours if total_duration_hours > 0 else None
 
         total_desat_events = sum(1 for r in readings if r.get('oxygen_level') is not None and float(r['oxygen_level']) < 90)
-        ODI = total_desat_events / total_duration_hours if total_duration_hours > 0 else None
+        all_desat_events = count_desaturation_events(readings, threshold=3)
+        ODI = all_desat_events / total_duration_hours if total_duration_hours > 0 else None
 
         snore_count = sum(1 for r in readings if r.get('snore') and float(r.get('snore')) > 0.5)
         snore_percentage = (snore_count / total_readings * 100) if total_readings > 0 else None
@@ -229,6 +252,22 @@ def full_report(session_id):
         non_supine_duration_hours = (len(non_supine_readings) * 3) / 3600.0 if non_supine_readings else 0
         supine_rate = supine_AH / supine_duration_hours if supine_duration_hours > 0 else None
         non_supine_rate = non_supine_AH / non_supine_duration_hours if non_supine_duration_hours > 0 else None
+
+        # --- Updated Supine vs Non-Supine ODI Calculation ---
+        supine_desat_events = count_desaturation_events(supine_readings, threshold=3)
+        non_supine_desat_events = count_desaturation_events(non_supine_readings, threshold=3)
+        ODI_Supine = supine_desat_events / supine_duration_hours if supine_duration_hours > 0 else None
+        ODI_NonSupine = non_supine_desat_events / non_supine_duration_hours if non_supine_duration_hours > 0 else None
+
+        # 2) Calculate Supine vs Non-Supine Average/Min SpO2
+        supine_oxygens = [float(r['oxygen_level']) for r in supine_readings if r.get('oxygen_level')]
+        non_supine_oxygens = [float(r['oxygen_level']) for r in non_supine_readings if r.get('oxygen_level')]
+
+        Average_SpO2_Supine = sum(supine_oxygens)/len(supine_oxygens) if supine_oxygens else None
+        Average_SpO2_NonSupine = sum(non_supine_oxygens)/len(non_supine_oxygens) if non_supine_oxygens else None
+
+        Min_SpO2_Supine = min(supine_oxygens) if supine_oxygens else None
+        Min_SpO2_NonSupine = min(non_supine_oxygens) if non_supine_oxygens else None
 
         obstructive_apnea = sum(1 for r in readings if r.get('event_type') == 'obstructive_apnea')
         obstructive_hypopnea = sum(1 for r in readings if r.get('event_type') == 'obstructive_hypopnea')
@@ -257,14 +296,58 @@ def full_report(session_id):
         desat_drops = [avg_oxygen - float(r['oxygen_level']) for r in readings if r.get('oxygen_level') is not None and avg_oxygen and float(r['oxygen_level']) < avg_oxygen]
         avg_desat_drop = sum(desat_drops) / len(desat_drops) if desat_drops else None
 
+        # Durations below thresholds (in minutes) for supine vs. non-supine
+        supine_dur_below_90 = sum(3 for r in supine_readings 
+                                if r.get('oxygen_level') and float(r['oxygen_level']) < 90) / 60.0
+        non_supine_dur_below_90 = sum(3 for r in non_supine_readings 
+                                    if r.get('oxygen_level') and float(r['oxygen_level']) < 90) / 60.0
+
+        supine_dur_below_88 = sum(3 for r in supine_readings 
+                                if r.get('oxygen_level') and float(r['oxygen_level']) < 88) / 60.0
+        non_supine_dur_below_88 = sum(3 for r in non_supine_readings 
+                                    if r.get('oxygen_level') and float(r['oxygen_level']) < 88) / 60.0
+
+        supine_dur_below_85 = sum(3 for r in supine_readings 
+                                if r.get('oxygen_level') and float(r['oxygen_level']) < 85) / 60.0
+        non_supine_dur_below_85 = sum(3 for r in non_supine_readings 
+                                    if r.get('oxygen_level') and float(r['oxygen_level']) < 85) / 60.0
+        
+        # If you also want a separate average desaturation drop for supine vs. non-supine, you can do:
+        supine_desat_drops = []
+        for r in supine_readings:
+            if r.get('oxygen_level') and avg_oxygen and float(r['oxygen_level']) < avg_oxygen:
+                supine_desat_drops.append(avg_oxygen - float(r['oxygen_level']))
+
+        non_supine_desat_drops = []
+        for r in non_supine_readings:
+            if r.get('oxygen_level') and avg_oxygen and float(r['oxygen_level']) < avg_oxygen:
+                non_supine_desat_drops.append(avg_oxygen - float(r['oxygen_level']))
+
+        avg_desat_drop_supine = sum(supine_desat_drops) / len(supine_desat_drops) if supine_desat_drops else None
+        avg_desat_drop_non_supine = sum(non_supine_desat_drops) / len(non_supine_desat_drops) if non_supine_desat_drops else None
+
         oxygen_saturation = {
             "ODI_per_hour": ODI,
+            "ODI_Supine": ODI_Supine,  # if you already computed it
+            "ODI_NonSupine": ODI_NonSupine,
             "Average_SpO2": avg_oxygen,
+            "Average_SpO2_Supine": Average_SpO2_Supine,        # if computed
+            "Average_SpO2_NonSupine": Average_SpO2_NonSupine,  # if computed
             "Minimum_SpO2": min_oxygen,
+            "Minimum_SpO2_Supine": Min_SpO2_Supine,            # if computed
+            "Minimum_SpO2_NonSupine": Min_SpO2_NonSupine,     # if computed
             "SpO2_Duration_below_90_minutes": dur_below_90,
             "SpO2_Duration_below_88_minutes": dur_below_88,
             "SpO2_Duration_below_85_minutes": dur_below_85,
-            "Average_Desaturation_Drop": avg_desat_drop
+            "SpO2_Duration_below_90_minutes_supine": supine_dur_below_90,
+            "SpO2_Duration_below_90_minutes_non_supine": non_supine_dur_below_90,
+            "SpO2_Duration_below_88_minutes_supine": supine_dur_below_88,
+            "SpO2_Duration_below_88_minutes_non_supine": non_supine_dur_below_88,
+            "SpO2_Duration_below_85_minutes_supine": supine_dur_below_85,
+            "SpO2_Duration_below_85_minutes_non_supine": non_supine_dur_below_85,
+            "Average_Desaturation_Drop": avg_desat_drop,
+            "Average_Desaturation_Drop_Supine": avg_desat_drop_supine,
+            "Average_Desaturation_Drop_NonSupine": avg_desat_drop_non_supine
         }
 
         # === Position Analysis ===
