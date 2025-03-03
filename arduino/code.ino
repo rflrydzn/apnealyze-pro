@@ -81,9 +81,44 @@ bool checkRecordingStatus() {
   return false;
 }
 
+/* -------------------- Thermistor + Flex Sensor Definitions -------------------- */
+// Thermistor
+const int THERMISTOR_PIN = A7;
+const float R_FIXED = 10000.0;  // 10k
+const float THERMISTOR_NOMINAL = 10000.0; // 10k at 25°C
+const float TEMPERATURE_NOMINAL = 25.0;
+const float B_COEFFICIENT = 3950.0;
+const float ABSOLUTE_ZERO = 273.15;
+const float ADC_MAX = 1023.0;
+const float V_SUPPLY = 3.3;
+const float TEMP_CHANGE_THRESHOLD = 0.1;
+
+float prevTempCelsius = 0.0;
+int lastBreathState = -1; // -1 = exhale, +1 = inhale
+int pendingCandidate = 0;
+
+// Flex sensor
+#define FLEX_PIN A0
+#define NUM_TRAINING_ROUNDS 5
+int inhaleValues[NUM_TRAINING_ROUNDS];
+int exhaleValues[NUM_TRAINING_ROUNDS];
+float avgInhale = 0.0;
+float avgExhale = 0.0;
+float threshold = 0.0;
+
+/* -------------------- Utility: Filtered ADC Read -------------------- */
+int filteredRead(int pin, int samples = 10) {
+  long sum = 0;
+  for (int i = 0; i < samples; i++) {
+    sum += analogRead(pin);
+    delay(5);
+  }
+  return sum / samples;
+}
+
 // Function to send sensor data to the backend via the /data endpoint.
 // The data string includes heart rate, oxygen saturation, confidence, and the detected sleep position.
-void sendDataToServer() {
+void sendDataToServer(String airflowState, String chestMovementState) {
   Serial.println("Sending sensor data to the server...");
   
   // Read bio sensor data
@@ -101,7 +136,9 @@ void sendDataToServer() {
   String data = "heartrate=" + String(body.heartRate) +
                 "&oxygen=" + String(body.oxygen) +
                 "&confidence=" + String(body.confidence) +
-                "&position=" + position;
+                "&position=" + position +
+                "&airflow_state=" + airflowState +
+                "&chest_movement_state=" + chestMovementState;
   
   WiFiClient dataClient;
   if (dataClient.connect(server, port)) {
@@ -118,6 +155,7 @@ void sendDataToServer() {
     Serial.println("Failed to connect for data sending.");
   }
 }
+
 
 void setup() {
   Serial.begin(115200);
@@ -149,24 +187,146 @@ void setup() {
     while (1);
   }
   Serial.println("IMU initialized. Sleeping Position Detection enabled.");
+  // ---- Wait before starting flex sensor calibration ----
+  Serial.println("Get ready for Flex Sensor calibration...");
+  Serial.println("Calibration will begin in 7 seconds.");
+  delay(7000);
+
+  // ----- Flex Sensor Calibration -----
+  Serial.println("=== Flex Sensor Breathing Calibration ===");
+  Serial.println("We will do 5 inhale-exhale rounds for calibration.");
+  Serial.println("Please follow the instructions on the Serial Monitor.");
+  Serial.println();
+
+  for (int i = 0; i < NUM_TRAINING_ROUNDS; i++) {
+    // Inhale calibration
+    Serial.print("Round ");
+    Serial.print(i + 1);
+    Serial.println(" - Inhale fully and hold...");
+    delay(2000);
+    int inhaleReading = analogRead(FLEX_PIN);
+    inhaleValues[i] = inhaleReading;
+    Serial.print("Captured Inhale Reading: ");
+    Serial.println(inhaleReading);
+    delay(1000);
+
+    // Exhale calibration
+    Serial.println("Now exhale fully and hold...");
+    delay(2000);
+    int exhaleReading = analogRead(FLEX_PIN);
+    exhaleValues[i] = exhaleReading;
+    Serial.print("Captured Exhale Reading: ");
+    Serial.println(exhaleReading);
+    Serial.println("----------------------------------------");
+    delay(2000);
+  }
+
+  // Compute average and threshold for flex sensor
+  long sumInhale = 0, sumExhale = 0;
+  for (int i = 0; i < NUM_TRAINING_ROUNDS; i++) {
+    sumInhale += inhaleValues[i];
+    sumExhale += exhaleValues[i];
+  }
+  avgInhale = (float)sumInhale / NUM_TRAINING_ROUNDS;
+  avgExhale = (float)sumExhale / NUM_TRAINING_ROUNDS;
+  threshold = (avgInhale + avgExhale) / 2.0;
+
+  Serial.println("=== Calibration Completed ===");
+  Serial.print("Average Inhale: ");
+  Serial.println(avgInhale);
+  Serial.print("Average Exhale: ");
+  Serial.println(avgExhale);
+  Serial.print("Threshold set at: ");
+  Serial.println(threshold);
+  Serial.println("Begin real-time monitoring...");
+  delay(2000);
+
+  // ----- Thermistor Baseline -----
+  int rawValue = filteredRead(THERMISTOR_PIN);
+  float vOut = (V_SUPPLY * rawValue) / ADC_MAX;
+  float rThermistor = R_FIXED * (V_SUPPLY - vOut) / vOut;
+  float t0Kelvin = TEMPERATURE_NOMINAL + ABSOLUTE_ZERO;
+  float lnRatio = log(rThermistor / THERMISTOR_NOMINAL);
+  float tempKelvin = 1.0 / ((1.0 / t0Kelvin) + (lnRatio / B_COEFFICIENT));
+  float tempCelsius = tempKelvin - ABSOLUTE_ZERO;
+  prevTempCelsius = tempCelsius;
+
+  // Default thermistor state: exhale = -1
+  lastBreathState = -1;
 }
 
 void loop() {
   // Poll the /recording/status endpoint.
-  // If recording is active, send sensor and position data every 3 seconds.
+  // If recording is active, send sensor and position data every 1 second.
   if (checkRecordingStatus()) {
-    sendDataToServer();
-    
-    // Also print the detected sleep position to Serial for debugging.
+    // --- 1) Read IMU for Sleep Position (optional debug) ---
     float x, y, z;
     if (IMU.accelerationAvailable()) {
       IMU.readAcceleration(x, y, z);
       String pos = detectSleepPosition(x, y, z);
       Serial.print("Detected Position: ");
       Serial.println(pos);
+      // You can pass 'pos' to sendDataToServer() if needed
     }
-    delay(3000);
+
+    // --- 2) Thermistor for Airflow Detection ---
+    int rawValue = filteredRead(THERMISTOR_PIN);
+    float vOut = (V_SUPPLY * rawValue) / ADC_MAX;
+    float rThermistor = R_FIXED * (V_SUPPLY - vOut) / vOut;
+    float t0Kelvin = TEMPERATURE_NOMINAL + ABSOLUTE_ZERO;
+    float lnRatio = log(rThermistor / THERMISTOR_NOMINAL);
+    float tempKelvin = 1.0 / ((1.0 / t0Kelvin) + (lnRatio / B_COEFFICIENT));
+    float tempCelsius = tempKelvin - ABSOLUTE_ZERO;
+    
+    // Compare with previous temperature to detect "inhale" (cooler) or "exhale" (warmer)
+    float diff = tempCelsius - prevTempCelsius;
+    int confirmedState = lastBreathState;  // Default: no change
+    
+    if (pendingCandidate == 0) {
+      if (diff > TEMP_CHANGE_THRESHOLD) {
+        pendingCandidate = +1; // Warmer → "exhale"
+      } else if (diff < -TEMP_CHANGE_THRESHOLD) {
+        pendingCandidate = -1; // Cooler → "inhale"
+      }
+    } else {
+      if ((pendingCandidate == +1) && (diff > TEMP_CHANGE_THRESHOLD)) {
+        confirmedState = +1;
+        pendingCandidate = 0;
+      } else if ((pendingCandidate == -1) && (diff < -TEMP_CHANGE_THRESHOLD)) {
+        confirmedState = -1;
+        pendingCandidate = 0;
+      } else {
+        pendingCandidate = 0;
+      }
+    }
+    
+    prevTempCelsius = tempCelsius;
+    lastBreathState = confirmedState;
+    
+    // Convert final state to a string
+    // (swap them if you prefer +1 = "inhale" and -1 = "exhale")
+    String airflowState = (confirmedState == +1) ? "inhale" : "exhale";
+
+    // --- 3) Flex Sensor for Chest Movement Detection ---
+    int flexValue = analogRead(FLEX_PIN);
+    // Compare flexValue with your calibrated threshold
+    String chestMovementState = (flexValue > threshold) ? "exhaling" : "inhaling";
+
+    // --- 4) Print Both States for Debugging ---
+    Serial.print("Airflow: ");
+    Serial.print(airflowState);
+    Serial.print(" | Chest: ");
+    Serial.println(chestMovementState);
+
+    // --- 5) Send Data to Server ---
+    // Make sure sendDataToServer(...) can handle the new fields
+    sendDataToServer(airflowState, chestMovementState);
+
+    // Wait 1 second before next reading
+    delay(1000);
+
   } else {
+    // If not recording, just wait 1 second
     delay(1000);
   }
 }

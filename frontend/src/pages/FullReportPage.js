@@ -188,7 +188,66 @@
     },
   };
 
+  const airflowData = report.respiratory_sensors?.map(sample => ({
+    x: new Date(sample.timestamp),
+    y: sample.airflow_state === "Inhale" ? 1 : 0  // Map "Inhale" to 1, "Exhale" (or "No Airflow") to 0; adjust as needed.
+  })) || [];
 
+  // Prepare data for Chest Movement Trends graph
+  const chestData = report.respiratory_sensors?.map(sample => ({
+    x: new Date(sample.timestamp),
+    y: sample.chest_movement_state === "Inhaling" ? 1 : 0  // Map "Inhaling" to 1, "Exhaling" to 0.
+  })) || [];
+
+  const airflowChartData = {
+    datasets: [
+      {
+        label: 'Airflow Trends',
+        data: airflowData,
+        borderColor: 'rgb(255, 159, 64)',
+        backgroundColor: 'rgba(255, 159, 64, 0.5)',
+        pointRadius: 2,
+      },
+    ],
+  };
+
+  const chestChartData = {
+    datasets: [
+      {
+        label: 'Chest Movement Trends',
+        data: chestData,
+        borderColor: 'rgb(75, 192, 192)',
+        backgroundColor: 'rgba(75, 192, 192, 0.5)',
+        pointRadius: 2,
+      },
+    ],
+  };
+
+  const timeScaleOptions = {
+    responsive: true,
+    scales: {
+      x: {
+        type: 'time',
+        time: {
+          unit: 'second',
+        },
+        title: {
+          display: true,
+          text: 'Time',
+        },
+      },
+      y: {
+        ticks: {
+          stepSize: 1,
+          callback: (value) => (value === 1 ? 'Yes' : 'No'),
+        },
+        title: {
+          display: true,
+          text: 'State',
+        },
+      },
+    },
+  };
 
     return (
       <div className="report-container">
@@ -403,35 +462,9 @@
               </tr>
             ))}
           <tr>
-              <td><strong>Supine (TST)</strong></td>
-              <td>{safeToFixed(report.position_analysis?.Supine_TST, 1)}</td>
-              <td>N/A</td>
+              
           </tr>
-          <tr>
-              <td><strong>Non-Supine (TST)</strong></td>
-              <td>{safeToFixed(report.position_analysis?.NonSupine_TST, 1)}</td>
-              <td>N/A</td>
-          </tr>
-          <tr>
-              <td>- Left (TST)</td>
-              <td>{safeToFixed(report.position_analysis?.Left_TST, 1)}</td>
-              <td>N/A</td>
-          </tr>
-          <tr>
-              <td>- Prone (TST)</td>
-              <td>{safeToFixed(report.position_analysis?.Prone_TST, 1)}</td>
-              <td>N/A</td>
-          </tr>
-          <tr>
-              <td>- Right (TST)</td>
-              <td>{safeToFixed(report.position_analysis?.Right_TST, 1)}</td>
-              <td>N/A</td>
-          </tr>
-          <tr>
-              <td><strong>Upright (TRT)</strong></td>
-              <td>{safeToFixed(report.position_analysis?.Upright, 1)}</td>
-              <td>N/A</td>
-          </tr>
+          
           </tbody>
         </table>
 
@@ -518,8 +551,14 @@
           <Scatter key={JSON.stringify(snoreChartData)} ref={snoreChartRef} data={snoreChartData} options={snoreChartOptions} />
         </div>
         <div className="chart-container">
-          <h3>Limitation Trends</h3>
-          {/* Placeholder for Limitation Trends Graph */}
+          <h3>Airflow Trends</h3>
+          <Line data={airflowChartData} options={timeScaleOptions} />
+        </div>
+
+      {/* New Graph: Chest Movement Trends */}
+        <div className="chart-container">
+          <h3>Chest Movement Trends</h3>
+          <Line data={chestChartData} options={timeScaleOptions} />
         </div>
 
         <hr />

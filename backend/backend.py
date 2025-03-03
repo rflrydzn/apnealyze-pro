@@ -19,7 +19,7 @@ current_session_id = None
 ###########################################
 # Helper Function: Insert Sensor Reading
 ###########################################
-def insert_data(heartrate, oxygen, confidence, position, session_id=None):
+def insert_data(heartrate, oxygen, confidence, position, airflow_state, chest_movement_state, session_id=None):
     try:
         connection = mysql.connector.connect(
             host=db_host,
@@ -30,19 +30,52 @@ def insert_data(heartrate, oxygen, confidence, position, session_id=None):
         if connection.is_connected():
             cursor = connection.cursor()
             query = """
-                INSERT INTO readings (heartrate, oxygen_level, confidence, position, session_id)
-                VALUES (%s, %s, %s, %s, %s)
+                INSERT INTO readings (heartrate, oxygen_level, confidence, position, 
+                                      airflow_state, chest_movement_state, session_id)
+                VALUES (%s, %s, %s, %s, %s, %s, %s)
             """
-            cursor.execute(query, (heartrate, oxygen, confidence, position, session_id))
+            cursor.execute(query, (heartrate, oxygen, confidence, position, 
+                                   airflow_state, chest_movement_state, session_id))
             connection.commit()
             cursor.close()
-            print("Data inserted:", heartrate, oxygen, confidence, position, session_id)
+            print("Data inserted:", heartrate, oxygen, confidence, position, 
+                  airflow_state, chest_movement_state, session_id)
     except Error as e:
         print("Error while inserting data into MySQL:", e)
     finally:
         if connection.is_connected():
             connection.close()
 
+@app.route('/respiratory_data', methods=['POST'])
+def receive_respiratory_data():
+    print("Received respiratory data request")  # Debug print
+    airflow_state = request.form.get('airflow_state')
+    session_id = request.form.get('session_id') or current_session_id
+    if airflow_state is None:
+        return "Missing airflow_state", 400
+
+    try:
+        connection = mysql.connector.connect(
+            host=db_host,
+            database=database,
+            user=db_user,
+            password=db_password
+        )
+        cursor = connection.cursor()
+        query = """
+            INSERT INTO respiratory_sensors (session_id, airflow_state)
+            VALUES (%s, %s)
+        """
+        cursor.execute(query, (session_id, airflow_state))
+        connection.commit()
+        cursor.close()
+        connection.close()
+        print("Respiratory data inserted:", session_id, airflow_state)  # Debug print
+        return "Respiratory data inserted", 200
+    except Exception as e:
+        print("Error inserting respiratory data:", e)
+        return jsonify({'msg': 'Error inserting respiratory data', 'error': str(e)}), 500
+    
 ###########################################
 # Helper Function: Count Desaturation Events
 ###########################################
@@ -137,10 +170,16 @@ def receive_data():
         oxygen = request.form.get('oxygen')
         confidence = request.form.get('confidence')
         position = request.form.get('position')  # New parameter from Arduino
+        airflow_state = request.form.get('airflow_state')
+        chest_movement_state = request.form.get('chest_movement_state')
         session_id = request.form.get('session_id') or current_session_id
 
-        if heartrate and oxygen and confidence and position:
-            insert_data(heartrate, oxygen, confidence, position, session_id)
+        if (heartrate is not None and oxygen is not None and confidence is not None 
+            and position is not None and airflow_state is not None 
+            and chest_movement_state is not None):
+            insert_data(heartrate, oxygen, confidence, position, 
+                        airflow_state, chest_movement_state, 
+                        session_id)
             return "Data received and stored.", 200
         else:
             return "Invalid data.", 400
@@ -218,8 +257,7 @@ def full_report(session_id):
         readings = cursor.fetchall()
         if not readings:
             return jsonify({'msg': 'No readings found for session.'}), 404
-        
-        
+            
         
         total_readings = len(readings)
         total_duration_seconds = total_readings * 3  # Each reading is 3 seconds
