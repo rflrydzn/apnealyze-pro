@@ -93,9 +93,17 @@ const float ADC_MAX = 1023.0;
 const float V_SUPPLY = 3.3;
 const float TEMP_CHANGE_THRESHOLD = 0.1;
 
+// Timing and state tracking
 float prevTempCelsius = 0.0;
-int lastBreathState = -1; // -1 = exhale, +1 = inhale
+int lastBreathState = 0;
 int pendingCandidate = 0;
+unsigned long lastPrintTime = 0;
+
+// Buffer for breath cycle detection (4 samples = 1s at 4Hz)
+const int BUFFER_SIZE = 4;
+int breathBuffer[BUFFER_SIZE] = {0};
+int bufferIndex = 0;
+
 
 // Flex sensor
 #define FLEX_PIN A0
@@ -245,13 +253,12 @@ void setup() {
   int rawValue = filteredRead(THERMISTOR_PIN);
   float vOut = (V_SUPPLY * rawValue) / ADC_MAX;
   float rThermistor = R_FIXED * (V_SUPPLY - vOut) / vOut;
+  
   float t0Kelvin = TEMPERATURE_NOMINAL + ABSOLUTE_ZERO;
   float lnRatio = log(rThermistor / THERMISTOR_NOMINAL);
   float tempKelvin = 1.0 / ((1.0 / t0Kelvin) + (lnRatio / B_COEFFICIENT));
-  float tempCelsius = tempKelvin - ABSOLUTE_ZERO;
-  prevTempCelsius = tempCelsius;
+  prevTempCelsius = tempKelvin - ABSOLUTE_ZERO;
 
-  // Default thermistor state: exhale = -1
   lastBreathState = -1;
 }
 
@@ -270,42 +277,64 @@ void loop() {
     }
 
     // --- 2) Thermistor for Airflow Detection ---
-    int rawValue = filteredRead(THERMISTOR_PIN);
-    float vOut = (V_SUPPLY * rawValue) / ADC_MAX;
-    float rThermistor = R_FIXED * (V_SUPPLY - vOut) / vOut;
-    float t0Kelvin = TEMPERATURE_NOMINAL + ABSOLUTE_ZERO;
-    float lnRatio = log(rThermistor / THERMISTOR_NOMINAL);
-    float tempKelvin = 1.0 / ((1.0 / t0Kelvin) + (lnRatio / B_COEFFICIENT));
-    float tempCelsius = tempKelvin - ABSOLUTE_ZERO;
-    
-    // Compare with previous temperature to detect "inhale" (cooler) or "exhale" (warmer)
-    float diff = tempCelsius - prevTempCelsius;
-    int confirmedState = lastBreathState;  // Default: no change
-    
-    if (pendingCandidate == 0) {
-      if (diff > TEMP_CHANGE_THRESHOLD) {
-        pendingCandidate = +1; // Warmer → "exhale"
-      } else if (diff < -TEMP_CHANGE_THRESHOLD) {
-        pendingCandidate = -1; // Cooler → "inhale"
-      }
-    } else {
-      if ((pendingCandidate == +1) && (diff > TEMP_CHANGE_THRESHOLD)) {
-        confirmedState = +1;
-        pendingCandidate = 0;
-      } else if ((pendingCandidate == -1) && (diff < -TEMP_CHANGE_THRESHOLD)) {
-        confirmedState = -1;
-        pendingCandidate = 0;
-      } else {
-        pendingCandidate = 0;
-      }
+    unsigned long currentTime = millis();
+
+  // === THERMISTOR SENSOR PROCESSING === //
+  int rawValue = filteredRead(THERMISTOR_PIN);
+  float vOut = (V_SUPPLY * rawValue) / ADC_MAX;
+  float rThermistor = R_FIXED * (V_SUPPLY - vOut) / vOut;
+  
+  float t0Kelvin = TEMPERATURE_NOMINAL + ABSOLUTE_ZERO;
+  float lnRatio = log(rThermistor / THERMISTOR_NOMINAL);
+  float tempKelvin = 1.0 / ((1.0 / t0Kelvin) + (lnRatio / B_COEFFICIENT));
+  float tempCelsius = tempKelvin - ABSOLUTE_ZERO;
+
+  float diff = tempCelsius - prevTempCelsius;
+  int confirmedState = lastBreathState;
+  
+
+  if (pendingCandidate == 0) {
+    if (diff > TEMP_CHANGE_THRESHOLD) {
+      pendingCandidate = +1; 
+    } else if (diff < -TEMP_CHANGE_THRESHOLD) {
+      pendingCandidate = -1;
     }
-    
-    prevTempCelsius = tempCelsius;
-    lastBreathState = confirmedState;
-    
-    // Convert final state to a string
-    // (swap them if you prefer +1 = "inhale" and -1 = "exhale")
-    String airflowState = (confirmedState == +1) ? "inhale" : "exhale";
+  } else {
+    if ((pendingCandidate == +1) && (diff > TEMP_CHANGE_THRESHOLD)) {
+      confirmedState = +1;
+      pendingCandidate = 0;
+    } else if ((pendingCandidate == -1) && (diff < -TEMP_CHANGE_THRESHOLD)) {
+      confirmedState = -1;
+      pendingCandidate = 0;
+    } else {
+      pendingCandidate = 0;
+    }
+  }
+
+  breathBuffer[bufferIndex] = confirmedState;
+  bufferIndex = (bufferIndex + 1) % BUFFER_SIZE;
+
+  bool hasCycle = false;
+  int firstState = breathBuffer[0];
+  for (int i = 1; i < BUFFER_SIZE; i++) {
+    if (breathBuffer[i] != firstState) {
+      hasCycle = true;
+      break;
+    }
+  }
+
+  // Determine Final Airflow State
+  String airflowState;
+  if (hasCycle) {
+    airflowState = "CYCLE";
+  } else if (lastBreathState == +1) {
+    airflowState = "INHALE";
+  } else {
+    airflowState = "EXHALE";
+  }
+
+  prevTempCelsius = tempCelsius;
+  lastBreathState = confirmedState;
 
     // --- 3) Flex Sensor for Chest Movement Detection ---
     int flexValue = analogRead(FLEX_PIN);
