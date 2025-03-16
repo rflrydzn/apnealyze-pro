@@ -1,0 +1,143 @@
+Array therm
+
+// Analog pin connected to the voltage divider
+const int THERMISTOR_PIN = A7;
+const float R_FIXED = 10000.0;  // 10 kΩ
+
+// Thermistor parameters for the Beta Equation
+const float THERMISTOR_NOMINAL = 10000.0; // Resistance at 25°C
+const float TEMPERATURE_NOMINAL = 25.0;   // °C
+const float B_COEFFICIENT = 3950.0;       // Beta Coefficient
+const float ABSOLUTE_ZERO = 273.15;       // For °C <-> K conversion
+
+// ADC reference voltage & resolution
+const float ADC_MAX = 1023.0;
+const float V_SUPPLY = 3.3;
+
+// Minimal change threshold (in °C) to consider a valid new breath event
+const float TEMP_CHANGE_THRESHOLD = 0.1;
+
+// Variables to store temperature readings
+float prevTempCelsius = 0.0;
+
+// Variables for timing / apnea detection
+unsigned long lastBreathTime = 0;
+const unsigned long APNEA_TIMEOUT = 10000; // 10 seconds
+
+// State variables
+//   +1 means "Exhale", -1 means "Inhale"
+int lastBreathState = 0;  
+int pendingCandidate = 0;
+
+// Breath data storage for 1 minute
+const int BUFFER_SIZE = 240; // 1 minute (60s / 250ms per reading)
+int breathStates[BUFFER_SIZE] = {0}; 
+int breathIndex = 0;
+unsigned long lastPrintTime = 0;
+
+// Returns an averaged ADC reading
+int filteredRead(int pin, int samples = 10) {
+  long sum = 0;
+  for (int i = 0; i < samples; i++) {
+    sum += analogRead(pin);
+    delay(5);
+  }
+  return sum / samples;
+}
+
+void setup() {
+  Serial.begin(9600);
+
+  // Initial baseline reading
+  int rawValue = filteredRead(THERMISTOR_PIN);
+  float vOut = (V_SUPPLY * rawValue) / ADC_MAX;
+  float rThermistor = R_FIXED * (V_SUPPLY - vOut) / vOut;
+
+  float t0Kelvin = TEMPERATURE_NOMINAL + ABSOLUTE_ZERO;
+  float lnRatio = log(rThermistor / THERMISTOR_NOMINAL);
+  float tempKelvin = 1.0 / ((1.0 / t0Kelvin) + (lnRatio / B_COEFFICIENT));
+  float tempCelsius = tempKelvin - ABSOLUTE_ZERO;
+
+  prevTempCelsius = tempCelsius;
+  lastBreathTime = millis();
+
+  // Assume initial state is Inhale (arbitrary choice)
+  lastBreathState = -1;
+}
+
+void loop() {
+  // 1. Filtered ADC read
+  int rawValue = filteredRead(THERMISTOR_PIN);
+
+  // 2. Voltage across fixed resistor
+  float vOut = (V_SUPPLY * rawValue) / ADC_MAX;
+
+  // 3. Thermistor's resistance
+  float rThermistor = R_FIXED * (V_SUPPLY - vOut) / vOut;
+
+  // 4. Temperature in °C
+  float t0Kelvin = TEMPERATURE_NOMINAL + ABSOLUTE_ZERO;
+  float lnRatio = log(rThermistor / THERMISTOR_NOMINAL);
+  float tempKelvin = 1.0 / ((1.0 / t0Kelvin) + (lnRatio / B_COEFFICIENT));
+  float tempCelsius = tempKelvin - ABSOLUTE_ZERO;
+
+  // 5. Compare temperature difference
+  float diff = tempCelsius - prevTempCelsius;
+  int confirmedState = lastBreathState;  // Default: no change
+
+  // Check for candidate and confirmation
+  if (pendingCandidate == 0) {
+    if (diff > TEMP_CHANGE_THRESHOLD) {
+      pendingCandidate = +1;  // Candidate for Exhale
+    } else if (diff < -TEMP_CHANGE_THRESHOLD) {
+      pendingCandidate = -1;  // Candidate for Inhale
+    }
+  } else {
+    if ((pendingCandidate == +1) && (diff > TEMP_CHANGE_THRESHOLD)) {
+      confirmedState = +1;
+      pendingCandidate = 0;
+    } else if ((pendingCandidate == -1) && (diff < -TEMP_CHANGE_THRESHOLD)) {
+      confirmedState = -1;
+      pendingCandidate = 0;
+    } else {
+      pendingCandidate = 0;
+    }
+  }
+
+  // 6. Output only if we have "Inhale" or "Exhale"
+  if (confirmedState != lastBreathState) {
+    if (confirmedState == +1) {
+      Serial.println("Exhale");
+    } else if (confirmedState == -1) {
+      Serial.println("Inhale");
+    }
+    lastBreathTime = millis(); // Reset timer
+  } else {
+    if (lastBreathState == +1) {
+      Serial.println("Exhale");
+    } else if (lastBreathState == -1) {
+      Serial.println("Inhale");
+    }
+  }
+
+  // Store the current state in the array
+  breathStates[breathIndex] = confirmedState;
+  breathIndex = (breathIndex + 1) % BUFFER_SIZE; // Circular buffer logic
+
+  // Every 60 seconds, print stored breath states
+  if (millis() - lastPrintTime >= 60000) {
+    Serial.print("Breath history (last 1 min): ");
+    for (int i = 0; i < BUFFER_SIZE; i++) {
+      Serial.print(breathStates[i]);
+      Serial.print(" ");
+    }
+    Serial.println();
+    lastPrintTime = millis(); // Reset print timer
+  }
+
+  // Update for next iteration
+  prevTempCelsius = tempCelsius;
+  lastBreathState = confirmedState;
+
+  delay(250);
+}
