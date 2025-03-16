@@ -40,7 +40,7 @@ def chest_callback(sender, data):
     sensor_data["chest_movement_state"] = data.decode('utf-8').strip()
 
 # ----------------------------------------------------------------------------
-# NEW FUNCTION: Checks the Flask server's /recording/status endpoint
+# Check recording status from backend
 # ----------------------------------------------------------------------------
 async def check_recording_status(session, status_url):
     try:
@@ -52,7 +52,7 @@ async def check_recording_status(session, status_url):
         print("Error checking recording status:", e)
     return False
 
-# Function to send sensor data to the backend using aiohttp
+# Send sensor data to the backend using aiohttp
 async def send_data_to_backend(session, backend_url):
     payload = {
         "heartrate": sensor_data["heartrate"],
@@ -71,40 +71,21 @@ async def send_data_to_backend(session, backend_url):
     except Exception as e:
         print("Error sending data:", e)
 
-# ----------------------------------------------------------------------------
-# MODIFIED data_sender to only send data if /recording/status == "true"
-# ----------------------------------------------------------------------------
+# Data sender: Only send if recording is active
 async def data_sender(backend_url, status_url):
     async with aiohttp.ClientSession() as session:
         while True:
-            # 1) Check if recording is active
             is_active = await check_recording_status(session, status_url)
-            
-            # 2) If active, send data; otherwise skip
             if is_active:
                 await send_data_to_backend(session, backend_url)
-            else:
-                # Optionally print a debug message
-                # print("Recording not active, skipping data send.")
-                pass
-            
-            # Wait 250ms before checking again
             await asyncio.sleep(0.25)
 
-async def scan_for_device(timeout=10):
-    devices = await BleakScanner.discover(timeout=timeout)
-    for d in devices:
-        print("Found device:", d.name, d.address)
-    return devices
-
 async def run():
-    # Scan for the BLE device with name "Nano33IoT_SensorHub"
     print("Scanning for BLE devices...")
     devices = await BleakScanner.discover()
     target_device = None
     for d in devices:
-        # Adjust as needed: if your device's name is "Nano33IoT_SensorHub",
-        # use that string. If it shows up as "Arduino", keep it as is.
+        # Adjust as needed: if your device's name is "Nano33IoT_SensorHub" or "Arduino"
         if d.name == "Arduino":
             target_device = d
             break
@@ -113,7 +94,6 @@ async def run():
         return
     print("Found device:", target_device)
 
-    # Adjust these as needed:
     backend_url = "http://192.168.100.151:5001/data"  
     status_url = "http://192.168.100.151:5001/recording/status"
 
@@ -123,7 +103,6 @@ async def run():
             return
         print("Connected to", target_device.address)
         
-        # Start notifications for all characteristics
         await client.start_notify(UUID_HEART_RATE, heart_rate_callback)
         await client.start_notify(UUID_OXYGEN, oxygen_callback)
         await client.start_notify(UUID_CONFIDENCE, confidence_callback)
@@ -131,7 +110,6 @@ async def run():
         await client.start_notify(UUID_AIRFLOW, airflow_callback)
         await client.start_notify(UUID_CHEST, chest_callback)
         
-        # Run the periodic data sender (checks server status every 250ms)
         await data_sender(backend_url, status_url)
 
 if __name__ == "__main__":
