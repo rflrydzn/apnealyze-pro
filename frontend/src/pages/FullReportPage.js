@@ -302,10 +302,7 @@
                   <td>{safeToFixed(report.respiratory_indices?.Apneas_NonSupine, 2, " /h")}</td>
                   <td>{report.respiratory_indices?.Apneas_Count || "N/A"}</td>
               </tr>
-              <tr>
-                  <td>- Obstructive (OA)</td>
-                  <td colSpan="4">{report.respiratory_indices?.Obstructive_Apneas_Count || "N/A"}</td>
-              </tr>
+              
               <tr>
                   <td><strong>Hypopneas</strong></td>
                   <td>{safeToFixed(report.respiratory_indices?.Hypopneas_Total, 2, " /h")}</td>
@@ -313,10 +310,7 @@
                   <td>{safeToFixed(report.respiratory_indices?.Hypopneas_NonSupine, 2, " /h")}</td>
                   <td>{report.respiratory_indices?.Hypopneas_Count || "N/A"}</td>
               </tr>
-              <tr>
-                  <td>- Obstructive (OH)</td>
-                  <td colSpan="4">{report.respiratory_indices?.Obstructive_Hypopneas_Count || "N/A"}</td>
-              </tr>
+              
           </tbody>
         </table>
 

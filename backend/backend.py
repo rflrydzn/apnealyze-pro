@@ -46,36 +46,6 @@ def insert_data(heartrate, oxygen, confidence, position, airflow_state, chest_mo
         if connection.is_connected():
             connection.close()
 
-@app.route('/respiratory_data', methods=['POST'])
-def receive_respiratory_data():
-    print("Received respiratory data request")  # Debug print
-    airflow_state = request.form.get('airflow_state')
-    session_id = request.form.get('session_id') or current_session_id
-    if airflow_state is None:
-        return "Missing airflow_state", 400
-
-    try:
-        connection = mysql.connector.connect(
-            host=db_host,
-            database=database,
-            user=db_user,
-            password=db_password
-        )
-        cursor = connection.cursor()
-        query = """
-            INSERT INTO respiratory_sensors (session_id, airflow_state)
-            VALUES (%s, %s)
-        """
-        cursor.execute(query, (session_id, airflow_state))
-        connection.commit()
-        cursor.close()
-        connection.close()
-        print("Respiratory data inserted:", session_id, airflow_state)  # Debug print
-        return "Respiratory data inserted", 200
-    except Exception as e:
-        print("Error inserting respiratory data:", e)
-        return jsonify({'msg': 'Error inserting respiratory data', 'error': str(e)}), 500
-    
 ###########################################
 # Helper Function: Count Desaturation Events
 ###########################################
@@ -265,10 +235,42 @@ def full_report(session_id):
         total_duration_seconds = total_readings * 3  # Each reading is 3 seconds
         total_duration_hours = total_duration_seconds / 3600.0
 
+        def count_flag_events(readings_list, flag_key='apnea_flag'):
+            """
+            Returns (event_count, supine_event_count, non_supine_event_count)
+            - event_count: total number of distinct events
+            - supine_event_count: events that happened in supine position
+            - non_supine_event_count: events that happened in non-supine
+            Consecutive 1's = single event. We increment count only on transition 0→1.
+            """
+            event_count = 0
+            supine_count = 0
+            non_supine_count = 0
+            prev_flag = 0  # track previous reading's flag
+            
+            for row in readings_list:
+                current_flag = int(row.get(flag_key, 0))
+                # Check for new event if we see a 0→1 transition
+                if current_flag == 1 and prev_flag == 0:
+                    event_count += 1
+                    # Determine supine or non-supine
+                    if row.get('position') == "Lying on Back (Supine)":
+                        supine_count += 1
+                    else:
+                        non_supine_count += 1
+                prev_flag = current_flag
+            
+            return (event_count, supine_count, non_supine_count)
         
+        apnea_count, apnea_supine, apnea_non_supine = count_flag_events(readings, 'apnea_flag')
+        hypopnea_count, hypopnea_supine, hypopnea_non_supine = count_flag_events(readings, 'hypopnea_flag')
+
         # === Overview Calculations ===
-        total_AH_events = sum(1 for r in readings if r.get('event_type') in ['apnea', 'hypopnea'])
+        total_AH_events = apnea_count + hypopnea_count  # total Apneas + Hypopneas
         AHI = total_AH_events / total_duration_hours if total_duration_hours > 0 else None
+
+        Apnea_rate = (apnea_count / total_duration_hours) if total_duration_hours > 0 else None
+        Hypopnea_rate = (hypopnea_count / total_duration_hours) if total_duration_hours > 0 else None
 
         total_desat_events = sum(1 for r in readings if r.get('oxygen_level') is not None and float(r['oxygen_level']) < 90)
         all_desat_events = count_desaturation_events(readings, threshold=3)
@@ -293,6 +295,18 @@ def full_report(session_id):
         supine_rate = supine_AH / supine_duration_hours if supine_duration_hours > 0 else None
         non_supine_rate = non_supine_AH / non_supine_duration_hours if non_supine_duration_hours > 0 else None
 
+        Apnea_rate_supine = (apnea_supine / supine_duration_hours) if supine_duration_hours > 0 else None
+        Apnea_rate_non_supine = (apnea_non_supine / non_supine_duration_hours) if non_supine_duration_hours > 0 else None
+
+        Hypopnea_rate_supine = (hypopnea_supine / supine_duration_hours) if supine_duration_hours > 0 else None
+        Hypopnea_rate_non_supine = (hypopnea_non_supine / non_supine_duration_hours) if non_supine_duration_hours > 0 else None
+
+        total_AH_supine = apnea_supine + hypopnea_supine
+        total_AH_non_supine = apnea_non_supine + hypopnea_non_supine
+        
+        AHI_supine = (total_AH_supine / supine_duration_hours) if supine_duration_hours > 0 else None
+        AHI_non_supine = (total_AH_non_supine / non_supine_duration_hours) if non_supine_duration_hours > 0 else None
+        
         # --- Updated Supine vs Non-Supine ODI Calculation ---
         supine_desat_events = count_desaturation_events(supine_readings, threshold=3)
         non_supine_desat_events = count_desaturation_events(non_supine_readings, threshold=3)
@@ -317,13 +331,28 @@ def full_report(session_id):
         avg_respiration_rate = sum(respiration_rates) / len(respiration_rates) if respiration_rates else None
 
         respiratory_indices = {
-            "Total_AH": total_AH_events,
-            "Supine_AH_per_hour": supine_rate,
-            "NonSupine_AH_per_hour": non_supine_rate,
-            "Obstructive_Apnea": obstructive_apnea,
-            "Obstructive_Hypopnea": obstructive_hypopnea,
-            "OA_OH_total": combined_OA_OH,
-            "Average_Respiration_Rate_per_min": avg_respiration_rate
+            # Apneas + Hypopneas
+            "AHI_Total": AHI,
+            "AHI_Supine": AHI_supine,
+            "AHI_NonSupine": AHI_non_supine,
+            "AHI_Count": total_AH_events,  # total distinct events
+
+            # Apneas
+            "Apneas_Total": Apnea_rate,
+            "Apneas_Supine": Apnea_rate_supine,
+            "Apneas_NonSupine": Apnea_rate_non_supine,
+            "Apneas_Count": apnea_count,
+
+            # Hypopneas
+            "Hypopneas_Total": Hypopnea_rate,
+            "Hypopneas_Supine": Hypopnea_rate_supine,
+            "Hypopneas_NonSupine": Hypopnea_rate_non_supine,
+            "Hypopneas_Count": hypopnea_count,
+
+            # If you want more detail on “Obstructive” or “Central,”
+            # you’d need separate logic or columns in DB
+            "Obstructive_Apneas_Count": None,
+            "Obstructive_Hypopneas_Count": None
         }
 
         # === Oxygen Saturation ===
