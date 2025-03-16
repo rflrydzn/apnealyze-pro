@@ -14,6 +14,8 @@ BLEIntCharacteristic confidenceChar("19B10003-E8F2-537E-4F6C-D104768A1214", BLER
 BLEStringCharacteristic positionChar("19B10004-E8F2-537E-4F6C-D104768A1214", BLERead | BLENotify, 32);
 BLEStringCharacteristic airflowStateChar("19B10005-E8F2-537E-4F6C-D104768A1214", BLERead | BLENotify, 16);
 BLEStringCharacteristic chestMovementStateChar("19B10006-E8F2-537E-4F6C-D104768A1214", BLERead | BLENotify, 16);
+BLEIntCharacteristic apneaFlagChar("19B10007-E8F2-537E-4F6C-D104768A1214", BLERead | BLENotify);
+BLEIntCharacteristic hypopneaFlagChar("19B10008-E8F2-537E-4F6C-D104768A1214", BLERead | BLENotify);
 
 // ----- Sensor & Global Variables -----
 int resPin = 4;
@@ -161,6 +163,12 @@ void performFlexCalibration() {
   saveCalibration();
 }
 
+// NEW FLAG IMPLEMENTATION - Global variables for event flags and baseline oxygen
+unsigned long lastAirflowChangeTime = 0;
+bool apneaFlag = false;
+bool hypopneaFlag = false;
+float baselineOxygen = 0;  // Baseline oxygen level
+
 void setup() {
   Serial.begin(115200);
   //while (!Serial);  // Open Serial Monitor for calibration feedback
@@ -180,6 +188,8 @@ void setup() {
   sensorService.addCharacteristic(positionChar);
   sensorService.addCharacteristic(airflowStateChar);
   sensorService.addCharacteristic(chestMovementStateChar);
+  sensorService.addCharacteristic(apneaFlagChar);   // <-- RE-ADD THIS
+  sensorService.addCharacteristic(hypopneaFlagChar);
   BLE.addService(sensorService);
   BLE.advertise();
   Serial.println("BLE SensorHub is now advertising...");
@@ -217,10 +227,18 @@ void setup() {
   
   // Assume initial breathing state is Inhale (-1)
   lastBreathState = -1;
+  lastAirflowChangeTime = millis();
+  
+  // NEW FLAG IMPLEMENTATION: Initialize baseline oxygen level from bio sensor
+  body = bioHub.readBpm();
+  baselineOxygen = body.oxygen;
 }
 
 void loop() {
   unsigned long loopStart = millis();
+  
+  // Save previous state for flag updates
+  int previousBreathState = lastBreathState;
   
   BLEDevice central = BLE.central();
   if (central) {
@@ -263,16 +281,16 @@ void loop() {
       }
     }
     
-    if (confirmedState != lastBreathState) {
-      if (confirmedState == +1)
-        Serial.println("Exhale");
-      else if (confirmedState == -1)
-        Serial.println("Inhale");
+    // NEW FLAG IMPLEMENTATION: Update airflow change timer if state changes
+    if (confirmedState != previousBreathState) {
+      lastAirflowChangeTime = millis();
+    }
+    
+    // NEW FLAG IMPLEMENTATION: Set apnea flag if no change for 10 seconds
+    if (millis() - lastAirflowChangeTime >= 10000) {
+      apneaFlag = true;
     } else {
-      if (lastBreathState == +1)
-        Serial.println("Exhale");
-      else if (lastBreathState == -1)
-        Serial.println("Inhale");
+      apneaFlag = false;
     }
     
     prevTempCelsius = tempCelsius;
@@ -285,6 +303,13 @@ void loop() {
     // 4) Read Bio Sensor Data (Heart Rate, Oxygen, Confidence)
     body = bioHub.readBpm();
     
+    // NEW FLAG IMPLEMENTATION: Check oxygen level drop for hypopnea (3% drop from baseline)
+    if (body.oxygen <= baselineOxygen - 3) {
+      hypopneaFlag = true;
+    } else {
+      hypopneaFlag = false;
+    }
+    
     // 5) Update BLE Characteristics with Sensor Data
     heartRateChar.writeValue(body.heartRate);
     oxygenChar.writeValue(body.oxygen);
@@ -293,7 +318,10 @@ void loop() {
     String airflowState = (confirmedState == +1) ? "Inhale" : "Exhale";
     airflowStateChar.writeValue(airflowState);
     chestMovementStateChar.writeValue(chestMovementState);
+    apneaFlagChar.writeValue(apneaFlag ? 1 : 0);
+    hypopneaFlagChar.writeValue(hypopneaFlag ? 1 : 0);
     
+    // NEW FLAG IMPLEMENTATION: Print apnea and hypopnea flags (0 or 1)
     Serial.print("Airflow: ");
     Serial.print(airflowState);
     Serial.print(" | Chest: ");
@@ -301,7 +329,11 @@ void loop() {
     Serial.print(" | HR: ");
     Serial.print(body.heartRate);
     Serial.print(" | O2: ");
-    Serial.println(body.oxygen);
+    Serial.print(body.oxygen);
+    Serial.print(" | Apnea: ");
+    Serial.print(apneaFlag ? "1" : "0");
+    Serial.print(" | Hypopnea: ");
+    Serial.println(hypopneaFlag ? "1" : "0");
   }
   
   unsigned long elapsed = millis() - loopStart;

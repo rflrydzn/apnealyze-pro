@@ -19,7 +19,7 @@ current_session_id = None
 ###########################################
 # Helper Function: Insert Sensor Reading
 ###########################################
-def insert_data(heartrate, oxygen, confidence, position, airflow_state, chest_movement_state, session_id=None):
+def insert_data(heartrate, oxygen, confidence, position, airflow_state, chest_movement_state, apnea_flag, hypopnea_flag, session_id=None):
     try:
         connection = mysql.connector.connect(
             host=db_host,
@@ -31,15 +31,15 @@ def insert_data(heartrate, oxygen, confidence, position, airflow_state, chest_mo
             cursor = connection.cursor()
             query = """
                 INSERT INTO readings (heartrate, oxygen_level, confidence, position, 
-                                      airflow_state, chest_movement_state, session_id)
-                VALUES (%s, %s, %s, %s, %s, %s, %s)
+                                      airflow_state, chest_movement_state, apnea_flag, hypopnea_flag, session_id)
+                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)
             """
             cursor.execute(query, (heartrate, oxygen, confidence, position, 
-                                   airflow_state, chest_movement_state, session_id))
+                                   airflow_state, chest_movement_state, apnea_flag, hypopnea_flag, session_id))
             connection.commit()
             cursor.close()
             print("Data inserted:", heartrate, oxygen, confidence, position, 
-                  airflow_state, chest_movement_state, session_id)
+                  airflow_state, chest_movement_state, apnea_flag, hypopnea_flag, session_id)
     except Error as e:
         print("Error while inserting data into MySQL:", e)
     finally:
@@ -172,13 +172,15 @@ def receive_data():
         position = request.form.get('position')  # New parameter from Arduino
         airflow_state = request.form.get('airflow_state')
         chest_movement_state = request.form.get('chest_movement_state')
+        apnea_flag = request.form.get('apnea_flag')  # Expected as "0" or "1"
+        hypopnea_flag = request.form.get('hypopnea_flag')
         session_id = request.form.get('session_id') or current_session_id
 
         if (heartrate is not None and oxygen is not None and confidence is not None 
             and position is not None and airflow_state is not None 
-            and chest_movement_state is not None):
+            and chest_movement_state is not None and apnea_flag is not None and hypopnea_flag is not None):
             insert_data(heartrate, oxygen, confidence, position, 
-                        airflow_state, chest_movement_state, 
+                        airflow_state, chest_movement_state, int(apnea_flag), int(hypopnea_flag), 
                         session_id)
             return "Data received and stored.", 200
         else:

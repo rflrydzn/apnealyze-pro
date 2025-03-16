@@ -9,6 +9,8 @@ UUID_CONFIDENCE = "19B10003-E8F2-537E-4F6C-D104768A1214"
 UUID_POSITION = "19B10004-E8F2-537E-4F6C-D104768A1214"
 UUID_AIRFLOW = "19B10005-E8F2-537E-4F6C-D104768A1214"
 UUID_CHEST = "19B10006-E8F2-537E-4F6C-D104768A1214"
+UUID_APNEA = "19B10007-E8F2-537E-4F6C-D104768A1214"
+UUID_HYPOPNOEA = "19B10008-E8F2-537E-4F6C-D104768A1214"
 
 # Global dictionary to store sensor data
 sensor_data = {
@@ -17,10 +19,11 @@ sensor_data = {
     "confidence": 0,
     "position": "",
     "airflow_state": "",
-    "chest_movement_state": ""
+    "chest_movement_state": "",
+    "apnea_flag": 0,
+    "hypopnea_flag": 0
 }
 
-# Notification callbacks for each characteristic
 def heart_rate_callback(sender, data):
     sensor_data["heartrate"] = int.from_bytes(data, byteorder='little')
     
@@ -39,9 +42,16 @@ def airflow_callback(sender, data):
 def chest_callback(sender, data):
     sensor_data["chest_movement_state"] = data.decode('utf-8').strip()
 
-# ----------------------------------------------------------------------------
-# Check recording status from backend
-# ----------------------------------------------------------------------------
+async def apnea_callback(sender, data):
+    sensor_data["apnea_flag"] = int.from_bytes(data, byteorder='little')
+
+async def hypopnea_callback(sender, data):
+    sensor_data["hypopnea_flag"] = int.from_bytes(data, byteorder='little')
+
+# In your BLE backend, you must also have a way to get the apnea and hypopnea flags.
+# This could be via additional BLE characteristics, or if you're sending them as part of the data payload.
+# For simplicity, assume that sensor_data is updated accordingly.
+
 async def check_recording_status(session, status_url):
     try:
         async with session.get(status_url) as resp:
@@ -52,7 +62,6 @@ async def check_recording_status(session, status_url):
         print("Error checking recording status:", e)
     return False
 
-# Send sensor data to the backend using aiohttp
 async def send_data_to_backend(session, backend_url):
     payload = {
         "heartrate": sensor_data["heartrate"],
@@ -61,6 +70,8 @@ async def send_data_to_backend(session, backend_url):
         "position": sensor_data["position"],
         "airflow_state": sensor_data["airflow_state"],
         "chest_movement_state": sensor_data["chest_movement_state"],
+        "apnea_flag": sensor_data["apnea_flag"],
+        "hypopnea_flag": sensor_data["hypopnea_flag"],
     }
     try:
         async with session.post(backend_url, data=payload) as resp:
@@ -71,7 +82,6 @@ async def send_data_to_backend(session, backend_url):
     except Exception as e:
         print("Error sending data:", e)
 
-# Data sender: Only send if recording is active
 async def data_sender(backend_url, status_url):
     async with aiohttp.ClientSession() as session:
         while True:
@@ -85,7 +95,6 @@ async def run():
     devices = await BleakScanner.discover()
     target_device = None
     for d in devices:
-        # Adjust as needed: if your device's name is "Nano33IoT_SensorHub" or "Arduino"
         if d.name == "Arduino":
             target_device = d
             break
@@ -109,6 +118,8 @@ async def run():
         await client.start_notify(UUID_POSITION, position_callback)
         await client.start_notify(UUID_AIRFLOW, airflow_callback)
         await client.start_notify(UUID_CHEST, chest_callback)
+        await client.start_notify(UUID_APNEA, apnea_callback)
+        await client.start_notify(UUID_HYPOPNOEA, hypopnea_callback)
         
         await data_sender(backend_url, status_url)
 
