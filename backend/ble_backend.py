@@ -39,6 +39,19 @@ def airflow_callback(sender, data):
 def chest_callback(sender, data):
     sensor_data["chest_movement_state"] = data.decode('utf-8').strip()
 
+# ----------------------------------------------------------------------------
+# NEW FUNCTION: Checks the Flask server's /recording/status endpoint
+# ----------------------------------------------------------------------------
+async def check_recording_status(session, status_url):
+    try:
+        async with session.get(status_url) as resp:
+            if resp.status == 200:
+                text = await resp.text()
+                return text.strip() == "true"
+    except Exception as e:
+        print("Error checking recording status:", e)
+    return False
+
 # Function to send sensor data to the backend using aiohttp
 async def send_data_to_backend(session, backend_url):
     payload = {
@@ -58,11 +71,24 @@ async def send_data_to_backend(session, backend_url):
     except Exception as e:
         print("Error sending data:", e)
 
-# Periodic task to forward data every 250ms
-async def data_sender(backend_url):
+# ----------------------------------------------------------------------------
+# MODIFIED data_sender to only send data if /recording/status == "true"
+# ----------------------------------------------------------------------------
+async def data_sender(backend_url, status_url):
     async with aiohttp.ClientSession() as session:
         while True:
-            await send_data_to_backend(session, backend_url)
+            # 1) Check if recording is active
+            is_active = await check_recording_status(session, status_url)
+            
+            # 2) If active, send data; otherwise skip
+            if is_active:
+                await send_data_to_backend(session, backend_url)
+            else:
+                # Optionally print a debug message
+                # print("Recording not active, skipping data send.")
+                pass
+            
+            # Wait 250ms before checking again
             await asyncio.sleep(0.25)
 
 async def scan_for_device(timeout=10):
@@ -77,6 +103,8 @@ async def run():
     devices = await BleakScanner.discover()
     target_device = None
     for d in devices:
+        # Adjust as needed: if your device's name is "Nano33IoT_SensorHub",
+        # use that string. If it shows up as "Arduino", keep it as is.
         if d.name == "Arduino":
             target_device = d
             break
@@ -85,7 +113,10 @@ async def run():
         return
     print("Found device:", target_device)
 
-    backend_url = "http://192.168.100.151:5001/data"  # Adjust as needed
+    # Adjust these as needed:
+    backend_url = "http://192.168.100.151:5001/data"  
+    status_url = "http://192.168.100.151:5001/recording/status"
+
     async with BleakClient(target_device.address) as client:
         if not client.is_connected:
             print("Failed to connect to the device.")
@@ -100,8 +131,8 @@ async def run():
         await client.start_notify(UUID_AIRFLOW, airflow_callback)
         await client.start_notify(UUID_CHEST, chest_callback)
         
-        # Run the periodic data sender indefinitely
-        await data_sender(backend_url)
+        # Run the periodic data sender (checks server status every 250ms)
+        await data_sender(backend_url, status_url)
 
 if __name__ == "__main__":
     asyncio.run(run())
