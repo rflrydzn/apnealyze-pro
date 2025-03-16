@@ -5,10 +5,8 @@
 #include <math.h>
 
 // ----- BLE Service & Characteristics Definitions -----
-// Define a custom BLE service UUID (you can choose any unique UUID)
 BLEService sensorService("19B10000-E8F2-537E-4F6C-D104768A1214");
 
-// Define characteristics for sensor data
 BLEIntCharacteristic heartRateChar("19B10001-E8F2-537E-4F6C-D104768A1214", BLERead | BLENotify);
 BLEIntCharacteristic oxygenChar("19B10002-E8F2-537E-4F6C-D104768A1214", BLERead | BLENotify);
 BLEIntCharacteristic confidenceChar("19B10003-E8F2-537E-4F6C-D104768A1214", BLERead | BLENotify);
@@ -17,7 +15,6 @@ BLEStringCharacteristic airflowStateChar("19B10005-E8F2-537E-4F6C-D104768A1214",
 BLEStringCharacteristic chestMovementStateChar("19B10006-E8F2-537E-4F6C-D104768A1214", BLERead | BLENotify, 16);
 
 // ----- Sensor & Global Variables -----
-// Sensor pins for the SparkFun Bio Sensor Hub
 int resPin = 4;
 int mfioPin = 5;
 SparkFun_Bio_Sensor_Hub bioHub(resPin, mfioPin);
@@ -47,11 +44,11 @@ String detectSleepPosition(float x, float y, float z) {
   }
 }
 
-/* -------------------- Thermistor + Flex Sensor Definitions -------------------- */
-// Thermistor constants
-const int THERMISTOR_PIN = A7;
-const float R_FIXED = 10000.0;  // 10k resistor
-const float THERMISTOR_NOMINAL = 10000.0; // 10k at 25°C
+/* -------------------- New Thermistor Logic -------------------- */
+// Use A0 for thermistor (new logic)
+const int THERMISTOR_PIN = A0;
+const float R_FIXED = 10000.0;  
+const float THERMISTOR_NOMINAL = 10000.0; 
 const float TEMPERATURE_NOMINAL = 25.0;
 const float B_COEFFICIENT = 3950.0;
 const float ABSOLUTE_ZERO = 273.15;
@@ -59,16 +56,13 @@ const float ADC_MAX = 1023.0;
 const float V_SUPPLY = 3.3;
 const float TEMP_CHANGE_THRESHOLD = 0.1;
 
-// Timing and state tracking for thermistor-based airflow detection
 float prevTempCelsius = 0.0;
-int lastBreathState = 0;
+int lastBreathState = 0;   // +1 means "Exhale", -1 means "Inhale"
 int pendingCandidate = 0;
-const int BUFFER_SIZE = 4;
-int breathBuffer[BUFFER_SIZE] = {0};
-int bufferIndex = 0;
 
-// Flex sensor definitions and calibration variables
-#define FLEX_PIN A0
+/* -------------------- Flex Sensor Definitions -------------------- */
+// To avoid conflict with thermistor (A0), assign flex sensor to A1
+#define FLEX_PIN A7
 #define NUM_TRAINING_ROUNDS 5
 int inhaleValues[NUM_TRAINING_ROUNDS];
 int exhaleValues[NUM_TRAINING_ROUNDS];
@@ -88,7 +82,7 @@ int filteredRead(int pin, int samples = 10) {
 
 void setup() {
   Serial.begin(115200);
-  while (!Serial);  // Wait for Serial to initialize
+  while (!Serial);
 
   Wire.begin();
 
@@ -99,16 +93,12 @@ void setup() {
   }
   BLE.setLocalName("Nano33IoT_SensorHub");
   BLE.setAdvertisedService(sensorService);
-
-  // Add all characteristics to the service
   sensorService.addCharacteristic(heartRateChar);
   sensorService.addCharacteristic(oxygenChar);
   sensorService.addCharacteristic(confidenceChar);
   sensorService.addCharacteristic(positionChar);
   sensorService.addCharacteristic(airflowStateChar);
   sensorService.addCharacteristic(chestMovementStateChar);
-
-  // Add the service and start advertising
   BLE.addService(sensorService);
   BLE.advertise();
   Serial.println("BLE SensorHub is now advertising...");
@@ -132,7 +122,6 @@ void setup() {
   Serial.println("Prepare for Flex Sensor calibration...");
   Serial.println("Calibration will begin in 7 seconds.");
   delay(7000);
-
   Serial.println("=== Flex Sensor Breathing Calibration ===");
   Serial.println("Perform 5 inhale-exhale rounds for calibration.");
   for (int i = 0; i < NUM_TRAINING_ROUNDS; i++) {
@@ -145,7 +134,6 @@ void setup() {
     Serial.print("Captured Inhale Reading: ");
     Serial.println(inhaleReading);
     delay(1000);
-
     Serial.println("Now exhale fully and hold...");
     delay(2000);
     int exhaleReading = analogRead(FLEX_PIN);
@@ -155,8 +143,6 @@ void setup() {
     Serial.println("----------------------------------------");
     delay(2000);
   }
-
-  // Compute average readings and set threshold
   long sumInhale = 0, sumExhale = 0;
   for (int i = 0; i < NUM_TRAINING_ROUNDS; i++) {
     sumInhale += inhaleValues[i];
@@ -165,7 +151,6 @@ void setup() {
   avgInhale = (float)sumInhale / NUM_TRAINING_ROUNDS;
   avgExhale = (float)sumExhale / NUM_TRAINING_ROUNDS;
   threshold = (avgInhale + avgExhale) / 2.0;
-
   Serial.println("=== Calibration Completed ===");
   Serial.print("Average Inhale: ");
   Serial.println(avgInhale);
@@ -176,25 +161,27 @@ void setup() {
   Serial.println("Begin real-time monitoring...");
   delay(2000);
 
-  // ----- Thermistor Baseline -----
+  // ----- Initialize Thermistor Baseline -----
   int rawValue = filteredRead(THERMISTOR_PIN);
   float vOut = (V_SUPPLY * rawValue) / ADC_MAX;
   float rThermistor = R_FIXED * (V_SUPPLY - vOut) / vOut;
   float t0Kelvin = TEMPERATURE_NOMINAL + ABSOLUTE_ZERO;
   float lnRatio = log(rThermistor / THERMISTOR_NOMINAL);
   float tempKelvin = 1.0 / ((1.0 / t0Kelvin) + (lnRatio / B_COEFFICIENT));
-  prevTempCelsius = tempKelvin - ABSOLUTE_ZERO;
-
+  float tempCelsius = tempKelvin - ABSOLUTE_ZERO;
+  prevTempCelsius = tempCelsius;
+  
+  // Assume initial state is Inhale (i.e. -1)
   lastBreathState = -1;
 }
 
 void loop() {
   unsigned long loopStart = millis();
   
-  // Check if a BLE central (client) is connected
+  // Only update if a BLE central (client) is connected
   BLEDevice central = BLE.central();
   if (central) {
-    // ----- 1) Read IMU for Sleep Position -----
+    // 1) Read IMU for Sleep Position
     String position = "Unknown Position";
     float x, y, z;
     if (IMU.accelerationAvailable()) {
@@ -203,8 +190,8 @@ void loop() {
       Serial.print("Detected Position: ");
       Serial.println(position);
     }
-
-    // ----- 2) Thermistor for Airflow Detection -----
+    
+    // 2) New Thermistor Logic for Airflow Detection (only Inhale/Exhale)
     int rawValue = filteredRead(THERMISTOR_PIN);
     float vOut = (V_SUPPLY * rawValue) / ADC_MAX;
     float rThermistor = R_FIXED * (V_SUPPLY - vOut) / vOut;
@@ -213,63 +200,62 @@ void loop() {
     float tempKelvin = 1.0 / ((1.0 / t0Kelvin) + (lnRatio / B_COEFFICIENT));
     float tempCelsius = tempKelvin - ABSOLUTE_ZERO;
     float diff = tempCelsius - prevTempCelsius;
-    int confirmedState = lastBreathState;
+    int confirmedState = lastBreathState; // default: no change
     
     if (pendingCandidate == 0) {
       if (diff > TEMP_CHANGE_THRESHOLD) {
-        pendingCandidate = +1; 
+        pendingCandidate = +1;  // Candidate for Exhale
       } else if (diff < -TEMP_CHANGE_THRESHOLD) {
-        pendingCandidate = -1;
+        pendingCandidate = -1;  // Candidate for Inhale
       }
     } else {
       if ((pendingCandidate == +1) && (diff > TEMP_CHANGE_THRESHOLD)) {
-        confirmedState = +1;
+        confirmedState = +1; // Exhale
         pendingCandidate = 0;
       } else if ((pendingCandidate == -1) && (diff < -TEMP_CHANGE_THRESHOLD)) {
-        confirmedState = -1;
+        confirmedState = -1; // Inhale
         pendingCandidate = 0;
       } else {
         pendingCandidate = 0;
       }
     }
-
-    breathBuffer[bufferIndex] = confirmedState;
-    bufferIndex = (bufferIndex + 1) % BUFFER_SIZE;
-
-    bool hasCycle = false;
-    int firstState = breathBuffer[0];
-    for (int i = 1; i < BUFFER_SIZE; i++) {
-      if (breathBuffer[i] != firstState) {
-        hasCycle = true;
-        break;
+    
+    // Print state (only "Inhale" or "Exhale")
+    if (confirmedState != lastBreathState) {
+      if (confirmedState == +1) {
+        Serial.println("Exhale");
+      } else if (confirmedState == -1) {
+        Serial.println("Inhale");
+      }
+    } else {
+      if (lastBreathState == +1) {
+        Serial.println("Exhale");
+      } else if (lastBreathState == -1) {
+        Serial.println("Inhale");
       }
     }
-    String airflowState;
-    if (hasCycle) {
-      airflowState = "CYCLE";
-    } else if (lastBreathState == +1) {
-      airflowState = "INHALE";
-    } else {
-      airflowState = "EXHALE";
-    }
+    
+    // Update thermistor state
     prevTempCelsius = tempCelsius;
     lastBreathState = confirmedState;
-
-    // ----- 3) Flex Sensor for Chest Movement Detection -----
+    
+    // 3) Flex Sensor for Chest Movement Detection
     int flexValue = analogRead(FLEX_PIN);
     String chestMovementState = (flexValue > threshold) ? "exhaling" : "inhaling";
-
-    // ----- 4) Read Bio Sensor Data (Heart Rate, Oxygen, Confidence) -----
+    
+    // 4) Read Bio Sensor Data (Heart Rate, Oxygen, Confidence)
     body = bioHub.readBpm();
-
-    // ----- 5) Update BLE Characteristics with Sensor Data -----
+    
+    // 5) Update BLE Characteristics with Sensor Data
     heartRateChar.writeValue(body.heartRate);
     oxygenChar.writeValue(body.oxygen);
     confidenceChar.writeValue(body.confidence);
     positionChar.writeValue(position);
+    // Use confirmedState to set airflow state ("Exhale" or "Inhale")
+    String airflowState = (confirmedState == +1) ? "Inhale" : "Exhale";
     airflowStateChar.writeValue(airflowState);
     chestMovementStateChar.writeValue(chestMovementState);
-
+    
     // Debug output to Serial Monitor
     Serial.print("Airflow: ");
     Serial.print(airflowState);
