@@ -235,6 +235,52 @@ def full_report(session_id):
         total_duration_seconds = total_readings * 3  # Each reading is 3 seconds
         total_duration_hours = total_duration_seconds / 3600.0
 
+        # ----------------------------------------------------------------------------
+        # 1) Gather timestamps for Apnea, Hypopnea, and Desaturation
+        # ----------------------------------------------------------------------------
+        # We'll store each event as the reading's "timestamp" whenever a new event occurs.
+        apnea_events = []
+        hypopnea_events = []
+        desat_events = []
+
+        # For Apnea/Hypopnea, we only want to record the moment of transition from 0→1.
+        # For Desaturation, we can record any reading that has a big drop from previous or is <90, etc.
+        
+        prev_apnea = 0
+        prev_hypopnea = 0
+        prev_oxygen = None
+
+        for row in readings:
+            tstamp = row.get('timestamp')   # Make sure your DB has a 'timestamp' column
+            # Apnea detection
+            cur_apnea = int(row.get('apnea_flag', 0))
+            if cur_apnea == 1 and prev_apnea == 0:
+                # New Apnea event starts here
+                apnea_events.append(tstamp)
+            prev_apnea = cur_apnea
+
+            # Hypopnea detection
+            cur_hypopnea = int(row.get('hypopnea_flag', 0))
+            if cur_hypopnea == 1 and prev_hypopnea == 0:
+                # New Hypopnea event starts here
+                hypopnea_events.append(tstamp)
+            prev_hypopnea = cur_hypopnea
+
+            # Desaturation detection
+            # Option A: If oxygen < 90, or Option B: If oxygen drop from prev >= 3
+            # For demonstration, let's do "if oxygen < 90"
+            cur_oxy = row.get('oxygen_level')
+            if cur_oxy is not None:
+                cur_oxy = float(cur_oxy)
+                # E.g., record any reading with oxygen < 90
+                if cur_oxy < 90:
+                    desat_events.append(tstamp)
+                
+                # or if prev_oxygen is not None and (prev_oxygen - cur_oxy >= 3):
+                #     desat_events.append(tstamp)
+
+                prev_oxygen = cur_oxy
+
         def count_flag_events(readings_list, flag_key='apnea_flag'):
             """
             Returns (event_count, supine_event_count, non_supine_event_count)
@@ -487,7 +533,12 @@ def full_report(session_id):
             "oxygen_levels": [float(r['oxygen_level']) for r in readings if r.get('oxygen_level')],
             "heart_rates": [float(r['heartrate']) for r in readings if r.get('heartrate')],
             "snore_values": [float(r.get('snore', 0)) for r in readings],
-            "event_types": [r.get('event_type', 'none') for r in readings]
+            "event_types": [r.get('event_type', 'none') for r in readings],
+            "airflow_states": [r.get('airflow_state', '') for r in readings],
+            "chest_movement_states": [r.get('chest_movement_state', '') for r in readings],
+            "apnea_events": apnea_events,
+            "hypopnea_events": hypopnea_events,
+            "desaturation_events": desat_events
         }
 
         # === Build the Full Report Dictionary ===
