@@ -272,13 +272,13 @@ def full_report(session_id):
             cur_oxy = row.get('oxygen_level')
             if cur_oxy is not None:
                 cur_oxy = float(cur_oxy)
-                # E.g., record any reading with oxygen < 90
+                # Desaturation detection
                 if cur_oxy < 90:
                     desat_events.append(tstamp)
-                
-                # or if prev_oxygen is not None and (prev_oxygen - cur_oxy >= 3):
-                #     desat_events.append(tstamp)
-
+                    # === ADD THIS: Treat desaturation as hypopnea ===
+                    row["hypopnea_flag"] = 1
+                else:
+                    row["hypopnea_flag"] = 0
                 prev_oxygen = cur_oxy
 
         def count_flag_events(readings_list, flag_key='apnea_flag'):
