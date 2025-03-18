@@ -232,7 +232,7 @@ def full_report(session_id):
             
         
         total_readings = len(readings)
-        total_duration_seconds = total_readings * 3  # Each reading is 3 seconds
+        total_duration_seconds = total_readings * 0.25  # Each reading is 3 seconds
         total_duration_hours = total_duration_seconds / 3600.0
 
         # ----------------------------------------------------------------------------
@@ -328,7 +328,8 @@ def full_report(session_id):
         overview = {
             "AHI": AHI,
             "ODI": ODI,
-            "Snore_Percentage": snore_percentage
+            "Snore_Percentage": snore_percentage,
+            "Session_Duration_Hours": total_duration_hours
         }
 
         # === Respiratory Indices ===
@@ -405,16 +406,16 @@ def full_report(session_id):
         oxygens = [float(r['oxygen_level']) for r in readings if r.get('oxygen_level') is not None]
         avg_oxygen = sum(oxygens) / len(oxygens) if oxygens else None
         min_oxygen = min(oxygens) if oxygens else None
-        dur_below_90 = sum(3 for r in readings if r.get('oxygen_level') is not None and float(r['oxygen_level']) < 90) / 60.0
-        dur_below_88 = sum(3 for r in readings if r.get('oxygen_level') is not None and float(r['oxygen_level']) < 88) / 60.0
-        dur_below_85 = sum(3 for r in readings if r.get('oxygen_level') is not None and float(r['oxygen_level']) < 85) / 60.0
+        dur_below_90 = sum(0.25 for r in readings if r.get('oxygen_level') is not None and float(r['oxygen_level']) < 90) / 60.0
+        dur_below_88 = sum(0.25 for r in readings if r.get('oxygen_level') is not None and float(r['oxygen_level']) < 88) / 60.0
+        dur_below_85 = sum(0.25 for r in readings if r.get('oxygen_level') is not None and float(r['oxygen_level']) < 85) / 60.0
         desat_drops = [avg_oxygen - float(r['oxygen_level']) for r in readings if r.get('oxygen_level') is not None and avg_oxygen and float(r['oxygen_level']) < avg_oxygen]
         avg_desat_drop = sum(desat_drops) / len(desat_drops) if desat_drops else None
 
         # Durations below thresholds (in minutes) for supine vs. non-supine
-        supine_dur_below_90 = sum(3 for r in supine_readings 
+        supine_dur_below_90 = sum(0.25 for r in supine_readings 
                                 if r.get('oxygen_level') and float(r['oxygen_level']) < 90) / 60.0
-        non_supine_dur_below_90 = sum(3 for r in non_supine_readings 
+        non_supine_dur_below_90 = sum(0.25 for r in non_supine_readings 
                                     if r.get('oxygen_level') and float(r['oxygen_level']) < 90) / 60.0
 
         supine_dur_below_88 = sum(3 for r in supine_readings 
@@ -468,14 +469,14 @@ def full_report(session_id):
         # === Position Analysis ===
         # Calculate total sleep time (TST) as readings with position not equal to "Sitting / Upright" (assuming upright is not sleep)
         TST_readings = [r for r in readings if r.get('position') != "Sitting / Upright"]
-        TST_minutes = (len(TST_readings) * 3) / 60.0 if TST_readings else 0
+        TST_minutes = (len(TST_readings) * 0.25) / 60.0 if TST_readings else 0
         TRT_minutes = total_duration_seconds / 60.0
 
         # For each distinct position, calculate duration and percentage relative to TST (for non-upright positions)
         position_durations = {}
         for r in readings:
             pos = r.get('position', 'Unknown')
-            position_durations[pos] = position_durations.get(pos, 0) + 3  # 3 seconds per reading
+            position_durations[pos] = position_durations.get(pos, 0) + 0.25  # 3 seconds per reading
 
         position_durations_m = {pos: seconds / 60.0 for pos, seconds in position_durations.items()}
         # Calculate percentages (for positions other than "Sitting / Upright")
@@ -505,8 +506,8 @@ def full_report(session_id):
         avg_heart_rate = sum(heart_rates) / len(heart_rates) if heart_rates else None
         max_heart_rate = max(heart_rates) if heart_rates else None
         min_heart_rate = min(heart_rates) if heart_rates else None
-        dur_below_40 = sum(3 for r in readings if r.get('heartrate') is not None and float(r['heartrate']) < 40) / 60.0
-        dur_above_100 = sum(3 for r in readings if r.get('heartrate') is not None and float(r['heartrate']) > 100) / 60.0
+        dur_below_40 = sum(0.25 for r in readings if r.get('heartrate') is not None and float(r['heartrate']) < 40) / 60.0
+        dur_above_100 = sum(0.25 for r in readings if r.get('heartrate') is not None and float(r['heartrate']) > 100) / 60.0
 
         pulse = {
             "Average_Heart_Rate": avg_heart_rate,

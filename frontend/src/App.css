@@ -41,10 +41,12 @@ h1, h2, h3 {
 
 .report-container {
   background: #fff;
-  padding: 20px;
+  padding: 1rem;
   border-radius: 6px;
   box-shadow: 0 0 8px rgba(0,0,0,0.1);
-  margin: 20px auto;
+  margin: 0 auto;
+  max-width: 1200px;
+
 }
 
 table {
@@ -62,8 +64,11 @@ th, td {
   text-align: center;
 }
 
+
 .chart-container {
-  margin: 20px 0;
+  width: 100%;
+  max-width: 800px;
+  margin: 1rem auto;
 }
 
 button {
@@ -120,4 +125,19 @@ form input {
   text-decoration: none;
   color: #3498db;
   font-weight: bold;
+}
+
+.chart-grid {
+  display: flex;           /* or display: grid; */
+  flex-direction: column;  /* stack each chart vertically */
+  max-height: 90vh;        /* fit into 90% of the viewport height */
+  overflow-y: auto;        /* scroll if needed */
+  margin-bottom: 1rem;
+}
+
+.chart-row {
+  height: 180px;  /* or 150px, tweak as desired */
+  margin-bottom: 0.5rem;
+  border: 1px solid #ddd; /* optional to separate rows */
+  /* background: #f9f9f9;   optional background color */
 }
