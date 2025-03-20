@@ -188,7 +188,7 @@ void setup() {
   sensorService.addCharacteristic(positionChar);
   sensorService.addCharacteristic(airflowStateChar);
   sensorService.addCharacteristic(chestMovementStateChar);
-  sensorService.addCharacteristic(apneaFlagChar);   // <-- RE-ADD THIS
+  sensorService.addCharacteristic(apneaFlagChar);
   sensorService.addCharacteristic(hypopneaFlagChar);
   BLE.addService(sensorService);
   BLE.advertise();
@@ -229,7 +229,7 @@ void setup() {
   lastBreathState = -1;
   lastAirflowChangeTime = millis();
   
-  // NEW FLAG IMPLEMENTATION: Initialize baseline oxygen level from bio sensor
+  // Initialize baseline oxygen level from bio sensor
   body = bioHub.readBpm();
   baselineOxygen = body.oxygen;
 }
@@ -281,16 +281,17 @@ void loop() {
       }
     }
     
-    // NEW FLAG IMPLEMENTATION: Update airflow change timer if state changes
-    if (confirmedState != previousBreathState) {
-      lastAirflowChangeTime = millis();
-    }
-    
-    // NEW FLAG IMPLEMENTATION: Set apnea flag if no change for 10 seconds
-    if (millis() - lastAirflowChangeTime >= 10000) {
+    // Modified Apnea Detection:
+    // Instead of checking for no state change, we now set the apnea flag only when the breathing state remains Inhale continuously for 10 seconds.
+    if (body.oxygen > 0 && confirmedState == +1 && (millis() - lastAirflowChangeTime >= 10000)) {
       apneaFlag = true;
     } else {
       apneaFlag = false;
+    }
+    
+    // Update airflow change timer if state changes
+    if (confirmedState != previousBreathState) {
+      lastAirflowChangeTime = millis();
     }
     
     prevTempCelsius = tempCelsius;
@@ -303,8 +304,8 @@ void loop() {
     // 4) Read Bio Sensor Data (Heart Rate, Oxygen, Confidence)
     body = bioHub.readBpm();
     
-    // NEW FLAG IMPLEMENTATION: Check oxygen level drop for hypopnea (3% drop from baseline)
-    if (body.oxygen <= baselineOxygen - 3) {
+    // Hypopnea Detection: Check if oxygen level drops 3% below baseline
+    if (body.oxygen > 0 && body.oxygen <= baselineOxygen - 3) {
       hypopneaFlag = true;
     } else {
       hypopneaFlag = false;
@@ -321,7 +322,7 @@ void loop() {
     apneaFlagChar.writeValue(apneaFlag ? 1 : 0);
     hypopneaFlagChar.writeValue(hypopneaFlag ? 1 : 0);
     
-    // NEW FLAG IMPLEMENTATION: Print apnea and hypopnea flags (0 or 1)
+    // Print data to Serial Monitor
     Serial.print("Airflow: ");
     Serial.print(airflowState);
     Serial.print(" | Chest: ");

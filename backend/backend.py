@@ -230,6 +230,17 @@ def full_report(session_id):
         if not readings:
             return jsonify({'msg': 'No readings found for session.'}), 404
             
+        snore_query = """
+            SELECT timestamp, snore
+            FROM snore_readings
+            WHERE session_id = %s
+            ORDER BY timestamp ASC
+        """
+        cursor.execute(snore_query, (session_id,))
+        snore_rows = cursor.fetchall()  # each row => { "timestamp": ..., "snore": ... }
+
+        if not readings and not snore_rows:
+            return jsonify({'msg': 'No data found for session.'}), 404
         
         total_readings = len(readings)
         total_duration_seconds = total_readings * 0.25  # Each reading is 3 seconds
@@ -273,11 +284,22 @@ def full_report(session_id):
             if cur_oxy is not None:
                 cur_oxy = float(cur_oxy)
                 # Desaturation detection
-                if cur_oxy < 90:
-                    desat_events.append(tstamp)
-                    # === ADD THIS: Treat desaturation as hypopnea ===
-                    row["hypopnea_flag"] = 1
+                # if cur_oxy < 90:
+                #     desat_events.append(tstamp)
+                #     # === ADD THIS: Treat desaturation as hypopnea ===
+                #     row["hypopnea_flag"] = 1
+                # else:
+                #     row["hypopnea_flag"] = 0
+                if prev_oxygen is not None:
+                    drop = prev_oxygen - cur_oxy
+                    # For a 3% drop threshold:
+                    if drop >= 3:
+                        desat_events.append(tstamp)
+                        row["hypopnea_flag"] = 1
+                    else:
+                        row["hypopnea_flag"] = 0
                 else:
+                    # First reading, no previous reference
                     row["hypopnea_flag"] = 0
                 prev_oxygen = cur_oxy
 
@@ -325,6 +347,15 @@ def full_report(session_id):
         snore_count = sum(1 for r in readings if r.get('snore') and float(r.get('snore')) > 0.5)
         snore_percentage = (snore_count / total_readings * 100) if total_readings > 0 else None
 
+        # ----------------------------------------------------------------------------
+        # 2) Get Snore Readings from snore_readings table
+        # ----------------------------------------------------------------------------
+        query_snore = "SELECT timestamp, snore FROM snore_readings WHERE session_id = %s ORDER BY timestamp ASC"
+        cursor.execute(query_snore, (session_id,))
+        snore_readings = cursor.fetchall()
+        # Optionally, filter to only include rows where snore==1:
+        snore_events = [row["timestamp"] for row in snore_readings if int(row.get("snore", 0)) == 1]
+
         overview = {
             "AHI": AHI,
             "ODI": ODI,
@@ -337,8 +368,8 @@ def full_report(session_id):
         non_supine_readings = [r for r in readings if r.get('position') != "Lying on Back (Supine)"]
         supine_AH = sum(1 for r in supine_readings if r.get('event_type') in ['apnea', 'hypopnea'])
         non_supine_AH = sum(1 for r in non_supine_readings if r.get('event_type') in ['apnea', 'hypopnea'])
-        supine_duration_hours = (len(supine_readings) * 3) / 3600.0 if supine_readings else 0
-        non_supine_duration_hours = (len(non_supine_readings) * 3) / 3600.0 if non_supine_readings else 0
+        supine_duration_hours = (len(supine_readings) * 0.25) / 3600.0 if supine_readings else 0
+        non_supine_duration_hours = (len(non_supine_readings) * 0.25) / 3600.0 if non_supine_readings else 0
         supine_rate = supine_AH / supine_duration_hours if supine_duration_hours > 0 else None
         non_supine_rate = non_supine_AH / non_supine_duration_hours if non_supine_duration_hours > 0 else None
 
@@ -418,14 +449,14 @@ def full_report(session_id):
         non_supine_dur_below_90 = sum(0.25 for r in non_supine_readings 
                                     if r.get('oxygen_level') and float(r['oxygen_level']) < 90) / 60.0
 
-        supine_dur_below_88 = sum(3 for r in supine_readings 
+        supine_dur_below_88 = sum(0.25 for r in supine_readings 
                                 if r.get('oxygen_level') and float(r['oxygen_level']) < 88) / 60.0
-        non_supine_dur_below_88 = sum(3 for r in non_supine_readings 
+        non_supine_dur_below_88 = sum(0.25 for r in non_supine_readings 
                                     if r.get('oxygen_level') and float(r['oxygen_level']) < 88) / 60.0
 
-        supine_dur_below_85 = sum(3 for r in supine_readings 
+        supine_dur_below_85 = sum(0.25 for r in supine_readings 
                                 if r.get('oxygen_level') and float(r['oxygen_level']) < 85) / 60.0
-        non_supine_dur_below_85 = sum(3 for r in non_supine_readings 
+        non_supine_dur_below_85 = sum(0.25 for r in non_supine_readings 
                                     if r.get('oxygen_level') and float(r['oxygen_level']) < 85) / 60.0
         
         # If you also want a separate average desaturation drop for supine vs. non-supine, you can do:
@@ -528,12 +559,19 @@ def full_report(session_id):
             "Average_RIP_Quality": avg_rip_quality
         }
 
+        snore_timestamps = []
+        for row in snore_rows:
+            # If row["snore"] == 1, it's a "snore event." If 0 means "no snore," you might only keep the "1" entries
+            if row["snore"] == 1:
+                snore_timestamps.append(row["timestamp"])
+
+
         # === Trend Overview Data ===
         trend_overview = {
             "positions": [r.get('position', 'Unknown') for r in readings],
             "oxygen_levels": [float(r['oxygen_level']) for r in readings if r.get('oxygen_level')],
             "heart_rates": [float(r['heartrate']) for r in readings if r.get('heartrate')],
-            "snore_values": [float(r.get('snore', 0)) for r in readings],
+            
             "event_types": [r.get('event_type', 'none') for r in readings],
             "airflow_states": [r.get('airflow_state', '') for r in readings],
             "chest_movement_states": [r.get('chest_movement_state', '') for r in readings],

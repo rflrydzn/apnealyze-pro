@@ -267,17 +267,22 @@ const FullReportPage = () => {
   };
 
   // Snore data
-  const snoreData = report.trend_overview?.snore_timestamps?.map(ts => ({ x: ts, y: 1 })) || [];
-  const snoreChartData = {
-    datasets: [
-      {
-        label: 'Snore Events',
-        data: snoreData,
-        backgroundColor: 'red',
-        pointRadius: 5,
-      },
-    ],
-  };
+  // Suppose we have:
+const snoreData = report.trend_overview?.snore_timestamps?.map((ts) => ({
+  x: new Date(ts),
+  y: 1, // Place them all at y=1 to show as a scatter event
+})) || [];
+
+const snoreChartData = {
+  datasets: [
+    {
+      label: 'Snore Events',
+      data: snoreData,
+      backgroundColor: 'red',
+      pointRadius: 5,
+    },
+  ],
+};
   const snoreChartOptions = {
     responsive: true,
     scales: {
