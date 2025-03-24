@@ -5,7 +5,10 @@ import MLPredictionPage from './pages/MLPredictionPage';
 import SessionsPage from './pages/SessionsPage';
 import FullReportPage from './pages/FullReportPage';
 import RecordingControlPage from './pages/RecordingControlPage';
+import ReportPage from './pages/ReportPage'; // new
+import GraphsPage from './pages/GraphsPage'; // new
 import './App.css';
+import HomePage from './pages/HomePage';
 
 function App() {
   return (
@@ -21,11 +24,13 @@ function App() {
         </nav>
 
         <Routes>
-          <Route path="/" element={<h1>Welcome to the Home Page</h1>} />
+          <Route path="/" element={<HomePage />} />
           <Route path="/ml-predict" element={<MLPredictionPage />} />
           <Route path="/recording" element={<RecordingControlPage />} />
           <Route path="/sessions" element={<SessionsPage />} />
           <Route path="/session/:sessionId" element={<FullReportPage />} />
+          <Route path="/session/:sessionId/report" element={<ReportPage />} />
+          <Route path="/session/:sessionId/graphs" element={<GraphsPage />} />
         </Routes>
       </div>
     </Router>

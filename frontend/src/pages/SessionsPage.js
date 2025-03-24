@@ -1,10 +1,17 @@
-// src/pages/SessionsPage.js
 import React, { useEffect, useState } from 'react';
 import axios from 'axios';
 import { Link } from 'react-router-dom';
 
 const SessionsPage = () => {
   const [sessions, setSessions] = useState([]);
+
+  // Mapping of session IDs to participant names
+  const sessionNames = {
+    232: "PARTICIPANT 1",
+    234: "PARTICIPANT 2",
+    238: "PARTICIPANT 3",
+    240: "PARTICIPANT 4"
+  };
 
   useEffect(() => {
     const fetchSessions = async () => {
@@ -24,8 +31,8 @@ const SessionsPage = () => {
       <ul className="sessions-list">
         {sessions.map(session => (
           <li key={session.id}>
-            <Link to={`/session/${session.id}`}>
-              Session #{session.id} started at {new Date(session.start_time).toLocaleString()}
+            <Link to={`/session/${session.id}/report`}>
+              {sessionNames[session.id] ? `${sessionNames[session.id]}, Session #${session.id}` : `Session #${session.id}`}
             </Link>
           </li>
         ))}

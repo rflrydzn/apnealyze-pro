@@ -283,7 +283,7 @@ void loop() {
     
     // Modified Apnea Detection:
     // Instead of checking for no state change, we now set the apnea flag only when the breathing state remains Inhale continuously for 10 seconds.
-    if (body.oxygen > 0 && confirmedState == +1 && (millis() - lastAirflowChangeTime >= 10000)) {
+    if (confirmedState == +1 && (millis() - lastAirflowChangeTime >= 10000)) {
       apneaFlag = true;
     } else {
       apneaFlag = false;

@@ -7,6 +7,16 @@ import librosa
 import wave
 import time
 import requests
+from dotenv import load_dotenv
+import os
+from pathlib import Path
+
+# Load .env from the parent of the backend folder
+env_path = Path(__file__).resolve().parent.parent / '.env'
+load_dotenv(dotenv_path=env_path)
+
+# Access the IP address from .env
+backend_ip = os.getenv("FLASK_IP_ADDRESS")
 
 # Load the trained model
 model = joblib.load("snore_detector.pkl")
@@ -69,7 +79,7 @@ try:
                 "snore": snore_detected
             }
             try:
-                response = requests.post("http://192.168.100.151:5001/snore_data", data=data)
+                response = requests.post(f"http://{backend_ip}:5001/snore_data", data=data)
                 print("Snore data sent:", response.text)
             except Exception as e:
                 print("Error sending snore data:", e)

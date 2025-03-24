@@ -46,6 +46,7 @@ h1, h2, h3 {
   box-shadow: 0 0 8px rgba(0,0,0,0.1);
   margin: 0 auto;
   max-width: 1200px;
+  height: 1450px;
 
 }
 
@@ -140,4 +141,57 @@ form input {
   margin-bottom: 0.5rem;
   border: 1px solid #ddd; /* optional to separate rows */
   /* background: #f9f9f9;   optional background color */
+}
+
+.top-right-buttons {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+  margin-bottom: 1rem;
+}
+
+/* Dark Mode */
+.recording-page.dark-mode {
+  background-color: #0b0c2a;
+  color: white;
+  transition: background 1s, color 1s;
+  position: relative;
+  overflow: hidden;
+}
+
+/* Stars animation */
+.recording-page.dark-mode::before,
+.recording-page.dark-mode::after {
+  content: '';
+  position: absolute;
+  width: 2px;
+  height: 2px;
+  background: white;
+  box-shadow: 
+    100px 200px white, 150px 400px white, 250px 100px white,
+    350px 300px white, 450px 150px white, 550px 250px white;
+  animation: twinkle 2s infinite alternate;
+}
+
+@keyframes twinkle {
+  0%   { opacity: 0.3; }
+  100% { opacity: 1; }
+}
+
+/* Moon */
+.recording-page.dark-mode .moon {
+  position: absolute;
+  top: 50px;
+  right: 60px;
+  width: 60px;
+  height: 60px;
+  background: radial-gradient(circle at 20% 20%, #fff, #ccc);
+  border-radius: 50%;
+  box-shadow: 0 0 10px 2px #fff;
+  animation: floatMoon 6s ease-in-out infinite alternate;
+}
+
+@keyframes floatMoon {
+  0%   { transform: translateY(0); }
+  100% { transform: translateY(-10px); }
 }

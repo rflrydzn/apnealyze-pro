@@ -1,6 +1,9 @@
 import asyncio
 from bleak import BleakClient, BleakScanner
 import aiohttp
+from dotenv import load_dotenv
+import os
+from pathlib import Path
 
 # UUIDs for the BLE characteristics (must match Arduino)
 UUID_HEART_RATE = "19B10001-E8F2-537E-4F6C-D104768A1214"
@@ -11,6 +14,13 @@ UUID_AIRFLOW = "19B10005-E8F2-537E-4F6C-D104768A1214"
 UUID_CHEST = "19B10006-E8F2-537E-4F6C-D104768A1214"
 UUID_APNEA = "19B10007-E8F2-537E-4F6C-D104768A1214"
 UUID_HYPOPNOEA = "19B10008-E8F2-537E-4F6C-D104768A1214"
+
+# Load .env from the parent of the backend folder
+env_path = Path(__file__).resolve().parent.parent / '.env'
+load_dotenv(dotenv_path=env_path)
+
+# Access the IP address from .env
+backend_ip = os.getenv("FLASK_IP_ADDRESS")
 
 # Global dictionary to store sensor data
 sensor_data = {
@@ -95,7 +105,7 @@ async def run():
     devices = await BleakScanner.discover()
     target_device = None
     for d in devices:
-        if d.name == "Arduino":
+        if d.name == "Nano33IoT_SensorHub":
             target_device = d
             break
     if not target_device:
@@ -103,8 +113,8 @@ async def run():
         return
     print("Found device:", target_device)
 
-    backend_url = "http://192.168.100.151:5001/data"  
-    status_url = "http://192.168.100.151:5001/recording/status"
+    backend_url = f"http://{backend_ip}:5001/data" 
+    status_url = f"http://{backend_ip}:5001/recording/status"
 
     async with BleakClient(target_device.address) as client:
         if not client.is_connected:

@@ -367,7 +367,7 @@ const snoreChartData = {
           <tr>
             <td><strong>Snore Percentage:</strong></td>
             <td>{safeToFixed(report.overview?.Snore_Percentage, 2, " %")}</td>
-            <td>{safeToFixed(report.overview?.Snore_Duration, 1, " min")}</td>
+            {/* <td>{safeToFixed(report.overview?.Snore_Duration, 1, " min")}</td> */}
           </tr>
           <tr>
             <td><strong>Total Session Duration (hours):</strong></td>

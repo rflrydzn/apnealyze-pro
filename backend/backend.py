@@ -25,7 +25,8 @@ def insert_data(heartrate, oxygen, confidence, position, airflow_state, chest_mo
             host=db_host,
             database=database,
             user=db_user,
-            password=db_password
+            password=db_password,
+            auth_plugin="mysql_native_password"
         )
         if connection.is_connected():
             cursor = connection.cursor()
@@ -76,7 +77,8 @@ def start_recording():
             host=db_host,
             database=database,
             user=db_user,
-            password=db_password
+            password=db_password,
+            auth_plugin="mysql_native_password"
         )
         cursor = connection.cursor()
         query = "INSERT INTO sessions (user_id) VALUES (%s)"
@@ -109,7 +111,8 @@ def stop_recording():
             host=db_host,
             database=database,
             user=db_user,
-            password=db_password
+            password=db_password,
+            auth_plugin="mysql_native_password"
         )
         cursor = connection.cursor()
         query = "UPDATE sessions SET end_time = NOW() WHERE id = %s"
@@ -169,7 +172,8 @@ def list_sessions():
             host=db_host,
             database=database,
             user=db_user,
-            password=db_password
+            password=db_password,
+            auth_plugin="mysql_native_password"
         )
         cursor = connection.cursor(dictionary=True)
         query = "SELECT * FROM sessions ORDER BY start_time DESC"
@@ -192,7 +196,8 @@ def get_session_data(session_id):
             host=db_host,
             database=database,
             user=db_user,
-            password=db_password
+            password=db_password,
+            auth_plugin="mysql_native_password"
         )
         cursor = connection.cursor(dictionary=True)
         query = "SELECT * FROM sessions WHERE id = %s"
@@ -221,7 +226,8 @@ def full_report(session_id):
             host=db_host,
             database=database,
             user=db_user,
-            password=db_password
+            password=db_password,
+            auth_plugin="mysql_native_password"
         )
         cursor = connection.cursor(dictionary=True)
         query = "SELECT * FROM readings WHERE session_id = %s ORDER BY timestamp ASC"
@@ -613,7 +619,8 @@ def receive_snore_data():
             host=db_host,
             database=database,
             user=db_user,
-            password=db_password
+            password=db_password,
+            auth_plugin="mysql_native_password"
         )
         cursor = connection.cursor()
         query = "INSERT INTO snore_readings (session_id, snore) VALUES (%s, %s)"

@@ -1,0 +1,131 @@
+/* Container for the entire page */
+.ml-container {
+    width: 90%;
+    max-width: 1200px;
+    margin: 0 auto;
+    padding: 20px;
+  }
+  
+  /* Title styles */
+  .ml-title {
+    text-align: center;
+    margin-bottom: 30px;
+  }
+  
+  /* Content: side-by-side layout */
+  .ml-content {
+    display: flex;
+    flex-wrap: wrap; /* fallback for smaller screens */
+    gap: 20px;
+  }
+  
+  /* Left side (the form) */
+  .ml-left {
+    flex: 1 1 45%;
+    background-color: #f9f9f9;
+    padding: 20px;
+    border-radius: 8px;
+  }
+  
+  /* Right side (facts/info) */
+  .ml-right {
+    flex: 1 1 45%;
+    background-color: #fff;
+    padding: 20px;
+    border-radius: 8px;
+    border: 1px solid #ddd;
+  }
+  
+  /* PredictForm styling */
+  .predict-form {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+  }
+  
+  .predict-form label {
+    font-weight: bold;
+  }
+  
+  /* Input fields */
+  .predict-form input {
+    padding: 8px;
+    font-size: 1rem;
+    border-radius: 4px;
+    border: 1px solid #ccc;
+  }
+  
+  /* Submit button */
+  .predict-form button {
+    margin-top: 15px;
+    background-color: #007BFF;
+    color: #fff;
+    font-size: 1rem;
+    border: none;
+    padding: 10px 15px;
+    border-radius: 4px;
+    cursor: pointer;
+  }
+  .predict-form button:hover {
+    background-color: #0056b3;
+  }
+  
+  /* Loading text styling */
+  .loading-text {
+    margin-top: 10px;
+    font-style: italic;
+    color: #444;
+  }
+  
+  /* Right side info styling */
+  .ml-right h2 {
+    margin-top: 0;
+  }
+  .ml-right ul {
+    margin-top: 10px;
+    margin-bottom: 20px;
+    list-style-type: disc;
+    padding-left: 20px;
+  }
+  
+  /* Modal overlay */
+  .modal {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(0,0,0,0.5);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 999;
+  }
+  
+  /* Modal content box */
+  .modal-content {
+    background: #fff;
+    padding: 20px;
+    border-radius: 8px;
+    border: 5px solid gray;
+    text-align: center;
+    min-width: 300px;
+  }
+  
+  /* Close button */
+  .close-button {
+    margin-top: 10px;
+    padding: 10px 15px;
+    border: none;
+    background: #444;
+    color: #fff;
+    font-size: 1rem;
+    cursor: pointer;
+    border-radius: 5px;
+    transition: 0.3s;
+  }
+  .close-button:hover {
+    background: #222;
+  }
+
+  
