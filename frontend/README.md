@@ -1,70 +1,136 @@
-# Getting Started with Create React App
+# 🛌 Sleep Apnea Detection System – User Manual
 
-This project was bootstrapped with [Create React App](https://github.com/facebook/create-react-app).
+Welcome to the Sleep Apnea Detection System! This guide will help you set up, run, and interpret results from your hardware and web application.
 
-## Available Scripts
+---
 
-In the project directory, you can run:
+## 🛠️ DEVICE SETUP
 
-### `npm start`
+### 1. Check Connections
+- ✅ Ensure all sensor cables are securely connected.
 
-Runs the app in the development mode.\
-Open [http://localhost:3000](http://localhost:3000) to view it in your browser.
+### 2. Wear the Device Properly
+- 🫁 Wear the **chest belt**
+- 🩸 Wear the **oximeter**
+- 👃 Wear the **nasal cannula**
 
-The page will reload when you make changes.\
-You may also see any lint errors in the console.
+### 3. Connect to Laptop
+- Plug the device into your **laptop's USB port**.
 
-### `npm test`
+---
 
-Launches the test runner in the interactive watch mode.\
-See the section about [running tests](https://facebook.github.io/create-react-app/docs/running-tests) for more information.
+## 💻 ARDUINO SETUP
 
-### `npm run build`
+### 4. Navigate to Arduino Folder
+```bash
+cd arduino
+```
 
-Builds the app for production to the `build` folder.\
-It correctly bundles React in production mode and optimizes the build for the best performance.
+### 5. Upload Code to Arduino
+- Open `ble_code.ino`
+- Copy the code
+- Launch **Arduino IDE**
+- Paste the code
+- Upload to the board
 
-The build is minified and the filenames include the hashes.\
-Your app is ready to be deployed!
+### 6. Flex Sensor Calibration
+- Open **Serial Monitor**
+- Follow the instructions to calibrate the flex sensor.
 
-See the section about [deployment](https://facebook.github.io/create-react-app/docs/deployment) for more information.
+### 7. Power Option
+- After calibration, you may disconnect from the laptop and connect to a **powerbank**.
 
-### `npm run eject`
+---
 
-**Note: this is a one-way operation. Once you `eject`, you can't go back!**
+## 🧠 BACKEND SETUP
 
-If you aren't satisfied with the build tool and configuration choices, you can `eject` at any time. This command will remove the single build dependency from your project.
+### 8. Navigate to Backend Folder
+```bash
+cd backend
+```
 
-Instead, it will copy all the configuration files and the transitive dependencies (webpack, Babel, ESLint, etc) right into your project so you have full control over them. All of the commands except `eject` will still work, but they will point to the copied scripts so you can tweak them. At this point you're on your own.
+### 9. Install Python Dependencies
+```bash
+pip install -r requirements.txt
+```
 
-You don't have to ever use `eject`. The curated feature set is suitable for small and middle deployments, and you shouldn't feel obligated to use this feature. However we understand that this tool wouldn't be useful if you couldn't customize it when you are ready for it.
+### 10. Run Backend Server
+```bash
+python backend.py
+```
+> Copy the IP from the output (e.g. `http://192.168.100.225:5001`) and paste into the `.env` in the **root folder** as:
+```
+FLASK_IP_ADDRESS=192.168.100.225
+```
 
-## Learn More
+### 11. Run BLE Backend
+```bash
+python ble_backend.py
+```
+- Should say **“Device connected”**.
 
-You can learn more in the [Create React App documentation](https://facebook.github.io/create-react-app/docs/getting-started).
+### 12. (Optional) Run Snoring Detection
+```bash
+python mic.py
+```
 
-To learn React, check out the [React documentation](https://reactjs.org/).
+---
 
-### Code Splitting
+## 🌐 FRONTEND SETUP
 
-This section has moved here: [https://facebook.github.io/create-react-app/docs/code-splitting](https://facebook.github.io/create-react-app/docs/code-splitting)
+### 13. Navigate to Frontend Folder
+```bash
+cd frontend
+```
 
-### Analyzing the Bundle Size
+### 14. Install Node.js Dependencies
+```bash
+npm install
+```
 
-This section has moved here: [https://facebook.github.io/create-react-app/docs/analyzing-the-bundle-size](https://facebook.github.io/create-react-app/docs/analyzing-the-bundle-size)
+### 15. Start the Web App
+```bash
+npm start
+```
 
-### Making a Progressive Web App
+---
 
-This section has moved here: [https://facebook.github.io/create-react-app/docs/making-a-progressive-web-app](https://facebook.github.io/create-react-app/docs/making-a-progressive-web-app)
+## 📋 USAGE INSTRUCTIONS
 
-### Advanced Configuration
+### ➤ Start Recording
+- Go to the **Recording Control** page.
+- Click **Start Recording**.
+- Verify data in the **backend.py** terminal.
 
-This section has moved here: [https://facebook.github.io/create-react-app/docs/advanced-configuration](https://facebook.github.io/create-react-app/docs/advanced-configuration)
+### 💤 While Sleeping
+- System records data as you sleep.
 
-### Deployment
+### 🛑 After Waking Up
+- Click **Stop Recording**.
+- Or unplug the device from powerbank.
 
-This section has moved here: [https://facebook.github.io/create-react-app/docs/deployment](https://facebook.github.io/create-react-app/docs/deployment)
+### 📊 View Report
+- Go to **Recording Sessions** to view detailed reports.
 
-### `npm run build` fails to minify
+---
 
-This section has moved here: [https://facebook.github.io/create-react-app/docs/troubleshooting#npm-run-build-fails-to-minify](https://facebook.github.io/create-react-app/docs/troubleshooting#npm-run-build-fails-to-minify)
+## 🧠 MACHINE LEARNING PREDICTION
+
+### ➤ Run ML API (Python 3.10)
+```bash
+cd backend
+python app.py
+```
+
+### ➤ Predict Severity
+- Navigate to **Machine Learning Prediction** in the app.
+- Input features.
+- Click **Submit** to receive prediction.
+
+> ⚠️ This ML model is **not a diagnostic tool**. It offers estimates based on your input.  
+> Achieved **91% accuracy**, but may misclassify **mild/moderate** due to data imbalance.  
+> **Don’t panic** if it shows "Severe" — consult a professional.
+
+---
+
+© 2025 Team 1 – Rafael Roy Dizon, Enrico Miguel Velasquez, Russel Ian Samson

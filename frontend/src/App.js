@@ -3,7 +3,6 @@ import React from 'react';
 import { BrowserRouter as Router, Routes, Route, Link } from 'react-router-dom';
 import MLPredictionPage from './pages/MLPredictionPage';
 import SessionsPage from './pages/SessionsPage';
-import FullReportPage from './pages/FullReportPage';
 import RecordingControlPage from './pages/RecordingControlPage';
 import ReportPage from './pages/ReportPage'; // new
 import GraphsPage from './pages/GraphsPage'; // new
@@ -28,7 +27,6 @@ function App() {
           <Route path="/ml-predict" element={<MLPredictionPage />} />
           <Route path="/recording" element={<RecordingControlPage />} />
           <Route path="/sessions" element={<SessionsPage />} />
-          <Route path="/session/:sessionId" element={<FullReportPage />} />
           <Route path="/session/:sessionId/report" element={<ReportPage />} />
           <Route path="/session/:sessionId/graphs" element={<GraphsPage />} />
         </Routes>
