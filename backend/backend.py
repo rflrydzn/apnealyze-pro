@@ -583,7 +583,8 @@ def full_report(session_id):
             "chest_movement_states": [r.get('chest_movement_state', '') for r in readings],
             "apnea_events": apnea_events,
             "hypopnea_events": hypopnea_events,
-            "desaturation_events": desat_events
+            "desaturation_events": desat_events,
+            "snore_timestamps": snore_timestamps
         }
 
         # === Build the Full Report Dictionary ===

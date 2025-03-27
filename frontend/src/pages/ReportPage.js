@@ -146,7 +146,7 @@ const ReportPage = () => {
       <hr />
       
       {/* Snoring & Breathing Events */}
-      <h2>3. Snoring & Breathing Events</h2>
+      <h2>3. Snoring </h2>
       <table>
         <thead>
           <tr>
