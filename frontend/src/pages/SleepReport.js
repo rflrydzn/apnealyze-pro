@@ -63,14 +63,21 @@ function SleepReport() {
 
   return (
     <div className="container w-75">
+      <div className="d-flex justify-content-between align-items-center">
       <h1>Overview</h1>
+      
+      <svg onClick={handlePrint} xmlns="http://www.w3.org/2000/svg" width="30" height="30" fill="currentColor" class="bi bi-printer-fill" style={{ cursor: 'pointer' }} viewBox="0 0 16 16">
+        <path d="M5 1a2 2 0 0 0-2 2v1h10V3a2 2 0 0 0-2-2zm6 8H5a1 1 0 0 0-1 1v3a1 1 0 0 0 1 1h6a1 1 0 0 0 1-1v-3a1 1 0 0 0-1-1"/>
+        <path d="M0 7a2 2 0 0 1 2-2h12a2 2 0 0 1 2 2v3a2 2 0 0 1-2 2h-1v-2a2 2 0 0 0-2-2H5a2 2 0 0 0-2 2v2H2a2 2 0 0 1-2-2zm2.5 1a.5.5 0 1 0 0-1 .5.5 0 0 0 0 1"/>
+      </svg>
+      </div>
       <ul class="list-group list-group-horizontal w-auto justify-content-between">
         <li class="list-group-item border-0 fs-4">AHI: {safeToFixed(report.overview?.AHI, 2, " /h")}</li>
         <li class="list-group-item border-0 fs-4">ODI: {safeToFixed(report.overview?.ODI, 2, " /h")}</li>
         <li class="list-group-item border-0 fs-4">
           Snore Percentage: {safeToFixed(report.overview?.Snore_Percentage, 2, " %")}
         </li>
-        <li class="list-group-item border-0 fs-4">Total Session Duration: {safeToFixed(report.overview?.Session_Duration_Hours, 2, " hrs")}</li>
+        <li class="list-group-item border-0 fs-4">Duration: {safeToFixed(report.overview?.Session_Duration_Hours, 2, " hrs")}</li>
       </ul>
 
       <table class="table table-borderless">

@@ -320,13 +320,14 @@ const FullReportGraphsPage = () => {
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
   <h1>Sleep Study Graphs</h1>
   <div style={{ display: 'flex', gap: '10px' }}>
-  <Link to="/sessions">
+  {/* <Link to="/sessions">
       <button>Back to Sessions</button>
-    </Link>
-    <Link to={`/session/${sessionId}/report`}>
+    </Link> */}
+    {/* <Link to={`/session/${sessionId}/report`}>
       <button>View Report</button>
-    </Link>
-    <button onClick={handlePrint}>Print Graphs</button>
+    </Link> */}
+    {/* <button onClick={handlePrint}>Print Graphs</button> */}
+    
     
   </div>
 </div>

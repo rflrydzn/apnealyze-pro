@@ -6,29 +6,31 @@ import SessionsPage from './pages/SessionsPage';
 import RecordingControlPage from './pages/RecordingControlPage';
 import ReportPage from './pages/ReportPage'; // new
 import GraphsPage from './pages/GraphsPage'; // new
-import './App.css';
+
 import HomePage from './pages/HomePage';
+import SleepReport from './pages/SleepReport';
+import SleepGraph from './pages/SleepGraph'
+import "bootstrap/dist/css/bootstrap.min.css";
+import FullReport from './pages/FullReport';
+import NewHomePage from './pages/NewHomePage'
+import About from './pages/About'
+import Header from './components/Header'
 
 function App() {
   return (
     <Router>
-      <div className="app-container">
-        <nav>
-          <ul>
-            <li><Link to="/">Home</Link></li>
-            <li><Link to="/ml-predict">Machine Learning Prediction</Link></li>
-            <li><Link to="/recording">Recording Control</Link></li>
-            <li><Link to="/sessions">Recording Sessions</Link></li>
-          </ul>
-        </nav>
+      <div className='container py-4'>
+        
+        <Header />
 
         <Routes>
-          <Route path="/" element={<HomePage />} />
+          <Route path="/" element={<NewHomePage />} />
           <Route path="/ml-predict" element={<MLPredictionPage />} />
           <Route path="/recording" element={<RecordingControlPage />} />
           <Route path="/sessions" element={<SessionsPage />} />
-          <Route path="/session/:sessionId/report" element={<ReportPage />} />
-          <Route path="/session/:sessionId/graphs" element={<GraphsPage />} />
+          <Route path="/session/:sessionId/report" element={<FullReport />} />
+          
+          <Route path="/about" element={<About />} />
         </Routes>
       </div>
     </Router>
