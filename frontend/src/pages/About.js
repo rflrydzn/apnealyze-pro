@@ -1,6 +1,7 @@
 import Team from "../assets/about.jpg";
 import Roy from "../assets/2x2.jpg";
 import Report from "../assets/report1.png"
+import Pic2 from "../assets/pic2.png"
 
 
 function About() {
@@ -122,22 +123,15 @@ function About() {
             Once you begin, the system records your vitals every 250 milliseconds—breath patterns, oxygen drops, and subtle disruptions all in high resolution.
             </p>
           </div>
-          <div class="col-md-5 order-md-1">
-            <svg
-              class="bd-placeholder-img bd-placeholder-img-lg featurette-image img-fluid mx-auto"
+          <div class="col-md-5 ">
+          <img
+              class="bd-placeholder-img bd-placeholder-img-lg featurette-image"
               width="500"
               height="500"
-              xmlns="http://www.w3.org/2000/svg"
-              role="img"
-              aria-label="Placeholder: 500x500"
-              preserveAspectRatio="xMidYMid slice"
-            >
-              <title>Placeholder</title>
-              <rect width="100%" height="100%" fill="var(--bs-secondary-bg)" />
-              <text x="50%" y="50%" fill="var(--bs-secondary-color)" dy=".3em">
-                500x500
-              </text>
-            </svg>
+              src={Pic2}
+              
+            
+            />
           </div>
         </div>
 
